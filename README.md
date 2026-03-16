@@ -2,6 +2,12 @@
 
 This repository contains study materials for the **Claude Certified Architect — Foundations** certification.
 
+![alt text](image.png)
+
+## Certificate
+
+![alt text](image-1.png)
+
 ## Course access
 
 To request access to the official course/exam portal, use this link:
