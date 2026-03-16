@@ -16,6 +16,7 @@ To request access to the official course/exam portal, use this link:
 ## PDF
 
 - **English guide**: [`guide_en.pdf`](./guide_en.pdf)
+- **Russian guide**: [`guide_ru.pdf`](./guide_ru.pdf)
 
 ## How to use
 
