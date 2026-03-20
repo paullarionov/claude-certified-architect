@@ -8,7 +8,7 @@ html {
 }
 
 body {
-  font-family: Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK JP", "Noto Sans JP", sans-serif;
   font-size: 0.95rem;
   line-height: 1.5;
   color: #1f2328;
