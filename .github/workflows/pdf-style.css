@@ -1,0 +1,232 @@
+@page {
+  size: A4;
+  margin: 14mm 16mm 16mm 16mm;
+}
+
+html {
+  font-size: 15px;
+}
+
+body {
+  font-family: Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #1f2328;
+  background: #ffffff;
+  margin: 0 auto;
+  max-width: 860px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Базовые отступы */
+p, ul, ol, blockquote, table, pre {
+  margin-top: 0.45em;
+  margin-bottom: 0.8em;
+}
+
+/* Заголовки */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 650;
+  line-height: 1.22;
+  color: #111827;
+  page-break-after: avoid;
+  break-after: avoid-page;
+}
+
+h1 {
+  font-size: 1.9rem;
+  margin: 0 0 0.7em;
+  padding-bottom: 0.22em;
+  border-bottom: 1px solid #d0d7de;
+}
+
+h2 {
+  font-size: 1.45rem;
+  margin-top: 1.5em;
+  margin-bottom: 0.55em;
+  padding-bottom: 0.18em;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+h3 {
+  font-size: 1.18rem;
+  margin-top: 1.2em;
+  margin-bottom: 0.45em;
+}
+
+h4 {
+  font-size: 1.02rem;
+  margin-top: 1em;
+  margin-bottom: 0.35em;
+}
+
+h5, h6 {
+  font-size: 0.95rem;
+  margin-top: 0.9em;
+  margin-bottom: 0.3em;
+}
+
+/* Чтобы новый раздел не начинался совсем внизу страницы */
+h1, h2 {
+  page-break-after: avoid;
+  break-after: avoid-page;
+}
+
+/* Ссылки */
+a {
+  color: #0969da;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Списки */
+ul, ol {
+  padding-left: 1.35em;
+}
+
+li {
+  margin: 0.18em 0;
+}
+
+li > ul,
+li > ol {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+}
+
+/* Горизонтальная линия */
+hr {
+  border: 0;
+  border-top: 1px solid #d8dee4;
+  margin: 1.5em 0;
+}
+
+/* Цитаты */
+blockquote {
+  margin-left: 0;
+  padding: 0.1em 1em;
+  color: #4b5563;
+  border-left: 4px solid #d0d7de;
+  background: #f6f8fa;
+}
+
+/* Inline code */
+code {
+  font-family: "JetBrains Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.88em;
+  background: #f6f8fa;
+  color: #111827;
+  padding: 0.12em 0.32em;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  white-space: break-spaces;
+}
+
+/* Code block */
+pre {
+  font-family: "JetBrains Mono", "Cascadia Code", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 1.42;
+  background: #f6f8fa;
+  color: #111827;
+  padding: 0.9em 1em;
+  border: 1px solid #d8dee4;
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  page-break-inside: avoid;
+  break-inside: avoid-page;
+}
+
+pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+  white-space: pre-wrap;
+}
+
+/* Таблицы */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  page-break-inside: auto;
+}
+
+thead {
+  display: table-header-group;
+}
+
+tr {
+  page-break-inside: avoid;
+  break-inside: avoid-page;
+}
+
+th, td {
+  border: 1px solid #d0d7de;
+  padding: 0.5em 0.65em;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #f6f8fa;
+  font-weight: 600;
+}
+
+tbody tr:nth-child(even) {
+  background: #fcfcfd;
+}
+
+/* Изображения */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.8em auto;
+  page-break-inside: avoid;
+  break-inside: avoid-page;
+}
+
+/* Подписи и мелкий текст */
+small {
+  font-size: 0.82em;
+  color: #6b7280;
+}
+
+/* Чтобы абзацы, списки и таблицы не отрывались от заголовка сразу после него */
+h1 + p, h1 + ul, h1 + ol, h1 + pre, h1 + table,
+h2 + p, h2 + ul, h2 + ol, h2 + pre, h2 + table,
+h3 + p, h3 + ul, h3 + ol, h3 + pre, h3 + table {
+  page-break-before: avoid;
+  break-before: avoid-page;
+}
+
+/* Лучше переносить длинные слова и URL */
+p, li, td, th {
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
+
+/* Более спокойный вид для strong/em */
+strong {
+  font-weight: 650;
+}
+
+em {
+  color: #374151;
+}
+
+/* Если есть task list */
+input[type="checkbox"] {
+  transform: scale(0.9);
+  margin-right: 0.35em;
+}

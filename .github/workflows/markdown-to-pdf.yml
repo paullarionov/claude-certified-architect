@@ -1,0 +1,61 @@
+name: Build Guide Markdown to PDF and Commit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-pdf:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install md-to-pdf
+        run: npm install -g md-to-pdf
+
+      - name: Convert guide_*.md to PDF
+        run: |
+          mkdir -p pdf
+          shopt -s nullglob nocaseglob
+          for file in guide_*.md; do
+            echo "Processing $file"
+            md-to-pdf "$file" \
+              --basedir "$(pwd)" \
+              --stylesheet "$(pwd)/.github/workflows/pdf-style.css" \
+              --launch-options '{"args":["--no-sandbox","--disable-setuid-sandbox"]}'
+            mv "${file%.*}.pdf" pdf/
+          done
+
+      - name: Upload PDFs to Actions artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: guide-pdfs
+          path: pdf/*.pdf
+
+      - name: Commit PDFs back to repo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add pdf/*.pdf
+          if ! git diff --cached --quiet; then
+            git commit -m "Update guide PDFs [skip ci]"
+            git push https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
+          else
+            echo "No changes in PDFs, skipping commit."
+          fi
