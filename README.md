@@ -19,6 +19,7 @@ To request access to the official course/exam portal, use this link:
 - **English guide**: [`guide_en.md`](./guide_en.md)
 - **Japanese guide**: [`guide_ja.md`](./guide_ja.md)
 - **Russian guide**: [`guide_ru.md`](./guide_ru.md)
+- **Chinese guide**: [`guide_zh.md`](./guide_zh.md)
 
 
 ## PDF
@@ -26,6 +27,7 @@ To request access to the official course/exam portal, use this link:
 - **English guide**: [`guide_en.pdf`](./pdf/guide_en.pdf)
 - **Japanese guide**: [`guide_ja.pdf`](./pdf/guide_ja.pdf)
 - **Russian guide**: [`guide_ru.pdf`](./pdf/guide_ru.pdf)
+- **Chinese guide**: [`guide_zh.pdf`](./pdf/guide_zh.pdf)
 
 ## How to use
 
