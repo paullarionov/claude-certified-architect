@@ -45,6 +45,6 @@ This repository contains study materials for the **Claude Certified Architect â€
 
 ## Follow:
 
-- LinkedIn: https://www.linkedin.com/in/paullarionov/
-- X: https://x.com/paullarionov?s=21&t=VTc-R7S1Res65NRI7BWTTg
+- LinkedIn: https://www.linkedin.com/in/paullarionov
+- X: https://x.com/paullarionov
 
