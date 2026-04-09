@@ -2556,3 +2556,504 @@ Los siguientes temas **NO** aparecerán en el examen:
 **Esta es la guía completa de certificación Claude Certified Architect, completamente traducida del ruso al español.**
 
 El documento incluye teoría fundamental, configuración práctica, estrategias avanzadas, dominios de examen, ejemplos de preguntas, ejercicios y recomendaciones de preparación.
+
+**Cuando usar Batch API vs API sincrónica:**
+
+| Tarea | API | Razón |
+|---|---|---|
+| Verificación pre-merge de PR | **Sincrónica** | El desarrollador espera resultado; 24 horas es inaceptable |
+| Reporte nocturno de deuda técnica | **Batch** | Resultado necesario por la mañana; 50% de ahorro |
+| Auditoría de seguridad semanal | **Batch** | Sin prisa; 50% de ahorro |
+| Revisión de código interactiva | **Sincrónica** | Necesita respuesta inmediata |
+| Procesamiento de 10,000 documentos | **Batch** | Procesamiento masivo; ahorro significativo |
+
+## 7.3 Trabajo con custom_id
+
+```json
+{
+  "custom_id": "doc-invoice-2024-001",
+  "params": {
+    "model": "claude-sonnet-4-6",
+    "max_tokens": 1024,
+    "messages": [{"role": "user", "content": "Extrae datos de: ..."}]
+  }
+}
+```
+
+`custom_id` permite:
+- Vincular el resultado con el documento original
+- Si falla -- reenviar **solo** los documentos fallidos
+- No reprocesar documentos que ya tuvieron éxito
+
+## 7.4 Manejo de fallos en lotes
+
+1. Envío de lote de 100 documentos
+2. 95 procesados exitosamente, 5 -- fallo (context limit exceeded)
+3. Identificación de fallos por `custom_id`
+4. Modificación (dividir documentos largos en fragmentos)
+5. Reenvío solo de los 5 documentos fallidos
+
+## 7.5 Cálculo de SLA
+
+Si se necesita resultado en 30 horas, y Batch API procesa hasta 24 horas:
+- Ventana de envío: 30 - 24 = **6 horas**
+- Los lotes deben enviarse no después de 24 horas antes del plazo
+- Para envíos frecuentes -- dividir en ventanas de 4 horas
+
+---
+
+# Capítulo 8: Estrategias de descomposición de tareas
+
+## 8.1 Pipelines fijos (Prompt Chaining)
+
+Cada paso está predefinido:
+```
+Documento -> Extracción de metadatos -> Extracción de datos -> Validación -> Enriquecimiento -> Salida final
+```
+
+**Cuándo usar:**
+- Estructura de tarea predecible (revisión siempre sigue el mismo patrón)
+- Todos los pasos se conocen de antemano
+- Se necesita estabilidad y reproducibilidad
+
+## 8.2 Descomposición adaptativa dinámica
+
+Las subtareas se generan basándose en resultados intermedios:
+```
+1. "Agrega pruebas para base de código legacy"
+2. -> Primero: mapear estructura (Glob, Grep)
+3. -> Descubierto: 3 módulos sin pruebas, 2 con cobertura parcial
+4. -> Priorización: comenzar con módulo de pagos (riesgo alto)
+5. -> Durante el proceso: descubierta dependencia de API externa
+6. -> Adaptación: agregar mock para API externa antes de escribir pruebas
+```
+
+**Cuándo usar:**
+- Tareas de investigación abiertas
+- Cuando el volumen de trabajo total se desconoce de antemano
+- Cuando cada paso depende de resultados anteriores
+
+## 8.3 Revisión de código en múltiples pasadas
+
+Para pull requests con 10+ archivos:
+
+```
+Pasada 1 (por archivo): Análisis de auth.ts -> lista de problemas locales
+Pasada 1 (por archivo): Análisis de database.ts -> lista de problemas locales
+Pasada 1 (por archivo): Análisis de routes.ts -> lista de problemas locales
+...
+Pasada 2 (integración): Análisis de relaciones entre archivos
+  -> Problemas entre archivos: tipos inconsistentes, dependencias cíclicas
+```
+
+**Por qué una sola pasada para 14 archivos es malo:**
+- Dilución de atención: análisis detallado de unos archivos, superficial de otros
+- Comentarios contradictorios: patrón marcado como problema en un archivo, aprobado en otro
+- Omisión de bugs: errores obvios omitidos por sobrecarga cognitiva
+
+---
+
+# Capítulo 9: Escalada y Human-in-the-Loop
+
+## 9.1 Cuándo escalar a un humano
+
+**Desencadenantes de escalada (reglas claras):**
+
+| Situación | Acción |
+|---|---|
+| Cliente explícitamente pide "dame un gerente" | Escalada inmediata, sin intentar resolver |
+| Política no cubre solicitud del cliente | Escalada (ej., comparación de precios con competencia, pero política no lo cubre) |
+| Agente no puede lograr progreso | Escalada después de intentos razonables |
+| Operación financiera por encima del umbral | Escalada (mejor mediante hook que mediante prompt) |
+| Múltiples coincidencias al buscar cliente | Solicitar identificadores adicionales, no adivinar |
+
+**Qué NO es desencadenante confiable:**
+
+| Método poco confiable | Por qué no funciona |
+|---|---|
+| Análisis de sentimiento | El sentimiento del cliente no correlaciona con complejidad del caso |
+| Auto-evaluación de confianza del modelo (1-10) | El modelo ya está incorrectamente confiado en decisiones erróneas; mal calibrado |
+| Clasificador automático | Exceso de complejidad; requiere datos de entrenamiento que puede no haber |
+
+## 9.2 Patrones de escalada
+
+**Escalada inmediata:**
+```
+Cliente: "Quiero hablar con un gerente"
+Agente: [llama inmediatamente escalate_to_human]
+NO: "Puedo ayudarte con tu pregunta, permíteme..."
+```
+
+**Escalada con intento de solución:**
+```
+Cliente: "Mi refrigerador se rompió 2 días después de comprar"
+Agente: [verifica pedido, ofrece reemplazo por garantía]
+Si cliente insatisfecho -> escalada
+```
+
+**Escalada matizada (acknowledge → resolve → escalate on reiteration):**
+```
+Cliente: "¡Esto es vergonzoso, estoy muy insatisfecho!"
+Agente: [reconoce decepción] "Entiendo tu decepción."
+       [ofrece solución] "Puedo ofrecer reemplazo o devolución."
+Cliente: "No, ¡quiero hablar con alguien!"
+Agente: [cliente reitera -> escalada inmediata]
+```
+Principio clave: primero reconocer emoción del cliente, luego ofrecer solución concreta, solo al reiterar insistencia -- escalar. No escales en la primera expresión de descontento (no es lo mismo que solicitar gerente).
+
+**Escalada por brecha en política:**
+```
+Cliente: "Competencia X tiene este producto 30% más barato, haz descuento"
+Política: describe solo ajustes de precio para el propio sitio
+Agente: [escalada -- política no cubre comparación de precios con competencia]
+```
+
+## 9.3 Protocolos de transferencia estructurados (Handoff)
+
+Al escalar, el agente debe transmitir al humano un resumen estructurado:
+
+```json
+{
+  "customer_id": "CUST-12345",
+  "customer_name": "Juan García",
+  "issue_summary": "Solicitud de devolución por producto dañado",
+  "order_id": "ORD-67890",
+  "root_cause": "Producto llegó dañado, fotos adjuntas",
+  "actions_taken": [
+    "Cliente verificado mediante get_customer",
+    "Pedido confirmado mediante lookup_order",
+    "Ofrecido reemplazo estándar -- cliente insiste en devolución"
+  ],
+  "refund_amount": "$89.99",
+  "recommended_action": "Aprobar devolución completa",
+  "escalation_reason": "Cliente solicitó hablar con gerente"
+}
+```
+
+El operador humano **no tiene acceso a la transcripción** -- solo ve este resumen. Por lo tanto debe ser completo y autosuficiente.
+
+## 9.4 Calibración de confianza y control humano
+
+Para sistemas de extracción de datos:
+
+1. **Field-level confidence scores:** el modelo produce puntuación de confianza para cada campo extraído
+2. **Calibración:** usar conjuntos de validación anotados para ajustar umbrales
+3. **Ruteo:**
+   - Alta confianza + precisión estable -> procesamiento automático
+   - Baja confianza o fuente ambigua -> revisión humana
+
+**Muestreo estratificado aleatorio:**
+- Incluso para extracciones de alta confianza, verifica regularmente muestras
+- Precisión agregada del 97% puede enmascarar 40% de errores en cierto tipo de documentos
+- Analiza precisión por tipo de documento y por campo, no solo en total
+
+---
+
+# Capítulo 10: Manejo de errores en sistemas multiagente
+
+## 10.1 Categorías de errores
+
+| Categoría | Ejemplos | ¿Reintentable? | Acción del agente |
+|---|---|---|---|
+| **Transitorio** | Timeout, 503, fallo de red | Sí | Reintentar con backoff exponencial |
+| **Validación** | Formato de entrada inválido, campo obligatorio faltante | No (necesita corregir entrada) | Cambiar solicitud e intentar de nuevo |
+| **Comercial** | Violación de política, límite excedido | No | Explicar al usuario, ofrecer alternativa |
+| **Permiso** | Sin permisos de acceso | No | Escalar |
+
+## 10.2 Antipatrones en manejo de errores
+
+| Antipatrón | Problema | Enfoque correcto |
+|---|---|---|
+| Estado genérico "search unavailable" | Coordinador no puede decidir recuperación | Devolver tipo de error, solicitud, resultados parciales, alternativas |
+| Supresión silenciosa (resultado vacío = éxito) | Coordinador piensa sin coincidencias, cuando fue fallo | Distinguir explícitamente "sin resultados" de "fallo en búsqueda" |
+| Terminar todo proceso si un fallo | Pérdida de todos resultados parciales | Continuar con resultados parciales, anotar vacíos |
+| Reintentos infinitos dentro de subagente | Retraso y gasto de recursos | Recuperación local (1-2 reintentos), luego propagar a coordinador |
+
+## 10.3 Error estructurado de subagente
+
+```json
+{
+  "status": "partial_failure",
+  "failure_type": "timeout",
+  "attempted_query": "Impacto de IA en industria musical 2024",
+  "partial_results": [
+    {"title": "Reporte de Generación de Música AI", "url": "...", "relevance": 0.8}
+  ],
+  "alternative_approaches": [
+    "Intentar búsqueda más específica: 'Herramientas de composición musical AI'",
+    "Usar fuente de datos alternativa"
+  ],
+  "coverage_impact": "No cubierto: impacto de IA en producción musical"
+}
+```
+
+El coordinador obtiene toda la información para decidir:
+- ¿Reintentar con solicitud modificada?
+- ¿Usar resultados parciales?
+- ¿Involucrar otro subagente?
+- ¿Continuar sin esta sección y anotar vacío?
+
+## 10.4 Anotaciones de cobertura en síntesis final
+
+```markdown
+## Reporte: Impacto de IA en industrias creativas
+
+### Artes visuales (COBERTURA COMPLETA)
+[resultados de investigación]
+
+### Música (COBERTURA PARCIAL -- timeout en búsqueda)
+[resultados parciales]
+⚠️ Nota: cobertura de esta sección limitada por timeout del agente de búsqueda.
+
+### Literatura (COBERTURA COMPLETA)
+[resultados de investigación]
+```
+
+---
+
+# Capítulo 11: Gestión de contexto en sistemas de producción
+
+## 11.1 Extracción de hechos en bloque separado
+
+En lugar de depender del historial de conversación (que se degrada con sumarización), extrae hechos clave en bloque estructurado:
+
+```
+=== HECHOS DEL CASO (actualizado cada nuevo hecho) ===
+ID del Cliente: CUST-12345
+ID del Pedido: ORD-67890
+Fecha del Pedido: 2025-01-15
+Monto del Pedido: $89.99
+Problema: Producto dañado en entrega
+Solicitud del Cliente: Devolución completa
+Estado: Esperando aprobación del gerente
+===
+```
+
+Este bloque se incluye en **cada** prompt, independientemente de sumarización del historial.
+
+## 11.2 Trimming de resultados de herramientas
+
+Si `lookup_order` devuelve 40+ campos, pero solo se necesitan 5 para la tarea actual:
+
+```python
+# Hook PostToolUse: mantener solo campos relevantes
+@hook("PostToolUse", tool="lookup_order")
+def trim_order_fields(result):
+    return {
+        "order_id": result["order_id"],
+        "status": result["status"],
+        "total": result["total"],
+        "items": result["items"],
+        "return_eligible": result["return_eligible"]
+    }
+```
+
+Esto ahorra ventana de contexto y reduce ruido.
+
+## 11.3 Entrada consciente de posición
+
+Coloca información crítica con conciencia del efecto "lost-in-the-middle":
+
+```
+[CONCLUSIONES CLAVE -- al principio]
+Se encontraron 3 vulnerabilidades críticas...
+
+[RESULTADOS DETALLADOS -- medio]
+=== Archivo auth.ts ===
+...
+=== Archivo database.ts ===
+...
+
+[INSTRUCCIONES DE ACCIÓN -- al final]
+Prioridad: corregir vulnerabilidades en auth.ts antes de merge.
+```
+
+## 11.4 Archivos Scratchpad
+
+Durante investigación prolongada de base de código, el agente puede registrar hallazgos clave en archivo scratchpad:
+
+```
+# investigation-scratchpad.md
+## Hallazgos clave
+- Clase PaymentProcessor en src/payments/processor.ts hereda de BaseProcessor
+- Método refund() se llama desde 3 lugares: OrderController, AdminPanel, CronJob
+- API externa PaymentGateway tiene limit de 100 req/min
+- Migración #47 agregó campo refund_reason (NOT NULL) -- 2024-12-01
+```
+
+Cuando contexto se degrada (o en nueva sesión), el agente accede a scratchpad en lugar de reinvestigar.
+
+## 11.5 Delegación a subagentes para proteger contexto
+
+```
+Agente principal: "Investiga dependencias del módulo de pagos"
+  -> Subagente (Explore): lee 15 archivos, traza importes
+  -> Devuelve: "Módulo de pagos depende de AuthService, OrderModel, y PaymentGateway API externa"
+
+Agente principal: guarda 1 línea en lugar de 15 archivos en contexto
+```
+
+**Capa de contexto separada (separate context layer):**
+En sistemas multiagente, cada subagente trabaja con presupuesto de contexto limitado -- recibe solo la información necesaria para su tarea. El coordinador actúa como capa de contexto separada: agrega resultados de subagentes, mantiene estado global y distribuye contexto. Esto previene "fuga de contexto", donde un agente consume ventana con información no relevante para otros.
+
+**Presupuestos de contexto limitados para subagentes:**
+- Transmite al subagente contexto mínimo: tarea específica + datos necesarios
+- Instruye al subagente devolver solo resultado estructurado, no datos en bruto
+- Usa `allowedTools` para limitar el conjunto de herramientas del subagente -- menos herramientas = menos distracciones y menos gasto de contexto
+
+## 11.6 Guardado estructurado de estado (para crash recovery)
+
+Cada agente exporta su estado a ubicación conocida:
+
+```json
+// agent-state/web-search-agent.json
+{
+  "status": "completed",
+  "queries_executed": ["IA music 2024", "AI music composition"],
+  "results_count": 12,
+  "key_findings": [...],
+  "coverage": ["music composition", "music production"],
+  "gaps": ["music distribution", "music licensing"]
+}
+```
+
+El coordinador carga manifiesto al reanudar:
+```json
+// agent-state/manifest.json
+{
+  "web-search": "completed",
+  "doc-analysis": "in_progress",
+  "synthesis": "not_started"
+}
+```
+
+---
+
+# Capítulo 12: Preservación de origen de información (Provenance)
+
+## 12.1 Problema de pérdida de atribución
+
+Cuando se sumariz resultados de múltiples fuentes, se pierde conexión "afirmación -> fuente":
+
+```
+❌ Incorrecto: "El mercado de IA en música se evalúa en $3.2 mil millones."
+   (¿De dónde? ¿Qué fuente? ¿Qué año?)
+
+✅ Correcto:
+{
+  "claim": "El mercado de IA en música se evalúa en $3.2 mil millones.",
+  "source_url": "https://example.com/report",
+  "source_name": "Global AI Music Report 2024",
+  "publication_date": "2024-06-15",
+  "confidence": 0.9
+}
+```
+
+## 12.2 Manejo de datos en conflicto
+
+Cuando dos fuentes dan cifras diferentes:
+
+```json
+{
+  "claim": "Porcentaje de música generada por IA en plataformas de streaming",
+  "values": [
+    {
+      "value": "12%",
+      "source": "Spotify Annual Report 2024",
+      "date": "2024-03",
+      "methodology": "Clasificación automática"
+    },
+    {
+      "value": "8%",
+      "source": "Music Industry Association Survey",
+      "date": "2024-07",
+      "methodology": "Encuesta a 500 sellos"
+    }
+  ],
+  "conflict_detected": true,
+  "possible_explanation": "Diferencia en metodología y período temporal"
+}
+```
+
+**NO** selecciones arbitrariamente un valor. Preserva ambos con atribución y deja que el coordinador decida.
+
+## 12.3 Inclusión de fechas para interpretación correcta
+
+Sin fechas, diferencias temporales se interpretan como contradicciones:
+
+```
+❌ "Fuente A dice 10%, fuente B dice 15%. Contradicción."
+✅ "Fuente A (2023) dice 10%, fuente B (2024) dice 15%. Probable crecimiento del 5% anual."
+```
+
+## 12.4 Renderizado por tipo de contenido
+
+No conviertas todo a único formato:
+- **Datos financieros** -> tablas
+- **Noticias y análisis** -> prosa
+- **Hallazgos técnicos** -> listas estructuradas
+- **Series temporales** -> orden cronológico
+
+---
+
+# Capítulo 13: Herramientas integradas de Claude Code
+
+## 13.1 Referencia de selección de herramientas
+
+| Tarea | Herramienta | Ejemplo |
+|---|---|---|
+| Encontrar archivos por nombre/patrón | **Glob** | `**/*.test.tsx`, `src/components/**/*.ts` |
+| Encontrar contenido en archivos | **Grep** | Nombre de función, mensaje de error, import |
+| Leer archivo completo | **Read** | Cargar archivo para análisis |
+| Escribir archivo nuevo | **Write** | Crear archivo nuevo desde cero |
+| Edición puntual de archivo existente | **Edit** | Reemplazar fragmento específico por texto único |
+| Ejecutar comando shell | **Bash** | git, npm, ejecutar pruebas, compilar |
+
+## 13.2 Estrategia de investigación incremental
+
+No leas todos los archivos a la vez. Construye comprensión incrementalmente:
+
+```
+1. Grep: encontrar puntos de entrada (definición de función, export)
+2. Read: leer archivos encontrados
+3. Grep: encontrar usos (import, llamadas)
+4. Read: leer archivos consumidores
+5. Repetir hasta construir comprensión completa
+```
+
+## 13.3 Fallback: Read + Write en lugar de Edit
+
+Cuando Edit falla por falta de coincidencia de texto único:
+1. **Read** -- cargar contenido completo del archivo
+2. Modificar contenido programáticamente
+3. **Write** -- escribir versión actualizada
+
+---
+
+# PARTE II: COMPENDIO POR DOMINIOS DEL EXAMEN
+
+---
+
+# Dominio 1: Arquitectura de agentes y orquestación (27%)
+
+## 1.1 Diseño de ciclos agentes para ejecución autónoma de tareas
+
+### Conocimientos clave:
+- **Ciclo de vida del agente**: enviar solicitud a Claude, verificar `stop_reason` (`"tool_use"` vs `"end_turn"`), ejecutar herramientas, devolver resultados para iteración siguiente
+- Los resultados de herramientas se agregan al historial de conversación para que el modelo razone sobre la siguiente acción
+- **Toma de decisiones dirigida por modelo** (Claude decide qué herramienta llamar) vs árboles de decisión predefinidos
+
+### Habilidades clave:
+- Implementar control de flujo: ciclo continúa con `stop_reason = "tool_use"` y finaliza con `"end_turn"`
+- Agregar resultados de herramientas al contexto entre iteraciones
+- **Antipatrones a evitar**: parsear texto del asistente para determinar finalización, establecer límites de iteración arbitrarios como mecanismo principal de parada
+
+## 1.2 Orquestación de sistemas multiagente (coordinador-subagente)
+
+### Conocimientos clave:
+- **Arquitectura Hub-and-spoke**: coordinador gestiona toda comunicación entre agentes, manejo de errores y enrutamiento de información
+- Los subagentes trabajan con **contexto aislado** -- NO heredan automáticamente el historial de conversación del coordinador
+- Rol del coordinador: descomposición de tareas, delegación, agregación de resultados, selección dinámica de subagentes
+- Riesgo de descomposición demasiado granular de tareas por coordinador
+
+### Habilidades clave:
