@@ -1697,3 +1697,862 @@ Este es un resumen completo de la guía de certificación Claude Certified Archi
 
 El documento incluye teoría fundamental, configuración práctica, estrategias avanzadas y dominios de examen.
 
+
+# Capítulo 3: Claude Agent SDK -- construcción de sistemas de agentes
+
+> Documentación: [Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview) | [Hooks](https://platform.claude.com/docs/en/agent-sdk/hooks) | [Subagentes](https://platform.claude.com/docs/en/agent-sdk/subagents) | [Sesiones](https://platform.claude.com/docs/en/agent-sdk/sessions)
+
+## 3.1 ¿Qué es el ciclo agente (Agentic Loop)?
+
+El ciclo agente es el patrón fundamental para la ejecución autónoma de tareas. El modelo no simplemente responde a una pregunta, sino que ejecuta una secuencia de acciones:
+
+```
+1. Enviar solicitud a Claude con herramientas
+2. Obtener respuesta
+3. Verificar stop_reason:
+   - "tool_use" -> ejecutar herramienta, agregar resultado al historial, ir al paso 1
+   - "end_turn" -> tarea completada, mostrar resultado al usuario
+4. Repetir hasta completar
+```
+
+**Este es un enfoque impulsado por el modelo (model-driven):** Claude decide por sí mismo qué herramienta llamar a continuación, basándose en el contexto y los resultados de las acciones anteriores. Esto lo diferencia de los árboles de decisión predefinidos, donde la secuencia de acciones está codificada.
+
+**Antipatrones (qué evitar):**
+- Parsear el texto del asistente para determinar la finalización ("Tarea completada" en el texto de respuesta)
+- Establecer un límite arbitrario de iteraciones (max_iterations=5) como mecanismo principal de parada
+- Verificar el contenido textual de la respuesta como indicador de finalización
+
+**Enfoque correcto:** la única señal confiable de finalización es `stop_reason == "end_turn"`.
+
+## 3.2 Configuración de AgentDefinition
+
+`AgentDefinition` es el objeto de configuración de un agente en Claude Agent SDK:
+
+```python
+agent = AgentDefinition(
+    name="customer_support",
+    description="Maneja solicitudes de clientes sobre devoluciones y problemas de pedidos",
+    system_prompt="Eres un agente de soporte al cliente...",
+    allowed_tools=["get_customer", "lookup_order", "process_refund", "escalate_to_human"],
+    # Para un coordinador:
+    # allowed_tools=["Task", "get_customer", ...]
+)
+```
+
+**Parámetros clave:**
+- `name` / `description` -- identificación y descripción del agente
+- `system_prompt` -- prompt del sistema con instrucciones
+- `allowed_tools` -- lista de herramientas permitidas (principio de privilegios mínimos)
+
+## 3.3 Hub-and-spoke: coordinador y subagentes
+
+La arquitectura multiagente se construye según el principio "hub-and-spoke" (topología de estrella):
+
+```
+         Coordinador
+        /     |      \
+  Subagente1  Subagente2  Subagente3
+  (búsqueda)  (análisis)   (síntesis)
+```
+
+**El coordinador es responsable de:**
+- Descomposición de la tarea en subtareas
+- Decisión sobre qué subagentes se necesitan (selección dinámica, no siempre todo el pipeline)
+- Delegación de tareas a subagentes
+- Agregación y validación de resultados
+- Manejo de errores y reintentos
+- Comunicación de resultados al usuario
+
+**Principio crítico: los subagentes tienen contexto aislado.**
+- Los subagentes **NO heredan** el historial de conversación del coordinador automáticamente
+- Todo el contexto debe ser **explícitamente transmitido** en el prompt del subagente
+- Los subagentes no comparten memoria entre llamadas
+- Toda la comunicación ocurre a través del coordinador (para observabilidad y control de errores)
+
+## 3.4 Herramienta Task para engendrar subagentes
+
+Los subagentes se generan a través de la herramienta `Task`:
+
+```python
+# allowed_tools del coordinador debe incluir "Task"
+coordinator_agent = AgentDefinition(
+    allowed_tools=["Task", "get_customer"]
+)
+```
+
+**La transmisión explícita de contexto es obligatoria:**
+```
+# Incorrecto: el subagente no conoce el contexto
+Task: "Analiza el documento"
+
+# Correcto: contexto completo en el prompt
+Task: "Analiza el siguiente documento.
+Documento: [texto completo del documento]
+Resultados de búsqueda anterior: [resultados de búsqueda web]
+Requisitos de formato de salida: [esquema]"
+```
+
+**Generación paralela:** el coordinador puede llamar múltiples `Task` en una respuesta -- los subagentes se lanzarán en paralelo:
+
+```
+# Una respuesta del coordinador contiene:
+Task 1: "Buscar artículos sobre tema X"
+Task 2: "Analizar documento Y"
+Task 3: "Buscar artículos sobre tema Z"
+# Los tres se ejecutarán simultáneamente
+```
+
+## 3.5 Hooks en Agent SDK
+
+Los hooks son un mecanismo para interceptar y transformar en determinados puntos del ciclo de vida del agente.
+
+**PostToolUse** -- intercepta el resultado de la herramienta antes de pasarlo al modelo:
+```python
+# Ejemplo: normalización de formatos de fecha de diferentes herramientas MCP
+@hook("PostToolUse")
+def normalize_dates(tool_result):
+    # Convertir Unix timestamp -> ISO 8601
+    # Convertir "Mar 5, 2025" -> "2025-03-05"
+    return normalized_result
+```
+
+**Hook de interceptación de llamadas salientes** -- bloquea acciones que violan políticas:
+```python
+# Ejemplo: bloquear devoluciones mayores a $500
+@hook("PreToolUse")
+def enforce_refund_limit(tool_call):
+    if tool_call.name == "process_refund" and tool_call.args.amount > 500:
+        return redirect_to_escalation(tool_call)
+```
+
+**Distinción clave: hooks vs instrucciones en prompts**
+
+| Característica | Hooks | Instrucciones en prompts |
+|---|---|---|
+| Garantía | **Determinística** (100%) | **Probabilística** (>90%, pero no 100%) |
+| Cuándo usar | Reglas comerciales críticas, operaciones financieras, cumplimiento | Preferencias generales, recomendaciones, formateo |
+| Ejemplo | Bloquear devoluciones >$500 | "Intenta resolver el problema antes de escalar" |
+
+**Regla:** cuando un error tiene consecuencias financieras, legales o de seguridad -- usa hooks, no prompts.
+
+
+# Capítulo 4: Model Context Protocol (MCP)
+
+> Documentación: [MCP](https://modelcontextprotocol.io/) | [Herramientas](https://modelcontextprotocol.io/docs/concepts/tools) | [Recursos](https://modelcontextprotocol.io/docs/concepts/resources) | [Servidores](https://modelcontextprotocol.io/docs/concepts/servers)
+
+## 4.1 ¿Qué es MCP?
+
+Model Context Protocol (MCP) es un protocolo abierto para conectar sistemas externos a Claude. MCP define tres tipos principales de recursos:
+
+1. **Herramientas (Tools)** -- funciones que el agente puede llamar para ejecutar acciones (operaciones CRUD, solicitudes a APIs, ejecución de comandos)
+2. **Recursos (Resources)** -- datos a los que el agente puede acceder para obtener contexto (documentación, esquemas de BD, catálogos de contenido)
+3. **Prompts (Prompts)** -- plantillas de prompts preestablecidas para tareas típicas
+
+## 4.2 Servidores MCP
+
+Un servidor MCP es un proceso que implementa el protocolo MCP y proporciona herramientas/recursos. Al conectar a un servidor MCP:
+- Todas las herramientas se descubren automáticamente
+- Las herramientas de todos los servidores conectados están disponibles simultáneamente
+- Las descripciones de las herramientas determinan cómo las usará el modelo
+
+## 4.3 Configuración de servidores MCP
+
+**Configuración del proyecto (`.mcp.json`)** -- para uso en equipo:
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "jira": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-jira"],
+      "env": {
+        "JIRA_TOKEN": "${JIRA_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+**Aspectos clave:**
+- El archivo `.mcp.json` se almacena en la raíz del proyecto y se gestiona a través de VCS
+- Se utilizan variables de entorno (`${GITHUB_TOKEN}`) para secretos -- los tokens en sí no se commitean
+- Está disponible para todos los miembros del proyecto
+
+**Configuración del usuario (`~/.claude.json`)** -- para servidores personales/experimentales:
+- Se almacena en el directorio home del usuario
+- No se transmite a través de VCS
+- Apto para experimentos personales y pruebas
+
+**Selección de servidores:**
+- Para integraciones estándar (Jira, GitHub, Slack) -- prefiere servidores MCP comunitarios existentes
+- Servidores propios -- solo para flujos de trabajo únicos específicos del equipo
+
+## 4.4 Bandera isError en MCP
+
+Cuando hay un error en una herramienta MCP, se usa la bandera `isError: true` en la respuesta. Esto señala al agente que la llamada falló.
+
+**Error estructurado (correcto):**
+```json
+{
+  "isError": true,
+  "content": {
+    "errorCategory": "transient",
+    "isRetryable": true,
+    "message": "El servicio no está disponible temporalmente. Timeout al acceder a la API de pedidos.",
+    "attempted_query": "order_id=12345",
+    "partial_results": null
+  }
+}
+```
+
+**Error genérico (antipatrón):**
+```json
+{
+  "isError": true,
+  "content": "Operation failed"
+}
+```
+
+Un error genérico no proporciona información al agente para tomar decisiones -- ¿reintentar? ¿cambiar la solicitud? ¿escalar?
+
+## 4.5 Recursos MCP (Resources)
+
+Los recursos son datos que el agente puede solicitar para obtener contexto sin ejecutar acciones:
+
+- Catálogos de contenido (lista de todas las tareas en el proyecto, navegación jerárquica)
+- Esquemas de bases de datos (comprensión de la estructura de datos)
+- Documentación (referencia de API, guías internas)
+- Resúmenes de problemas/tareas
+
+**Ventaja de los recursos:** el agente no necesita hacer llamadas de herramientas exploratorias para entender los datos disponibles. Un recurso proporciona un "mapa" de inmediato.
+
+---
+
+# Capítulo 5: Claude Code -- configuración y flujos de trabajo
+
+> Documentación: [Claude Code](https://code.claude.com/docs/en/overview) | [Memoria / CLAUDE.md](https://code.claude.com/docs/en/memory) | [Skills](https://code.claude.com/docs/en/skills) | [MCP](https://code.claude.com/docs/en/mcp) | [Hooks](https://code.claude.com/docs/en/hooks) | [Subagentes](https://code.claude.com/docs/en/sub-agents) | [GitHub Actions](https://code.claude.com/docs/en/github-actions) | [Sin interfaz](https://code.claude.com/docs/en/headless)
+
+## 5.1 Jerarquía de CLAUDE.md
+
+CLAUDE.md es un archivo (o archivos) con instrucciones para Claude Code. Existe una jerarquía con tres niveles:
+
+```
+1. Usuario: ~/.claude/CLAUDE.md
+   - Se aplica solo a este usuario
+   - NO se transmite a través de VCS
+   - Preferencias personales, estilo de trabajo
+
+2. Proyecto: .claude/CLAUDE.md o CLAUDE.md en la raíz
+   - Se aplica a todos los miembros del proyecto
+   - Gestionado a través de VCS
+   - Estándares de codificación, pruebas, decisiones arquitectónicas
+
+3. Directorio: CLAUDE.md en subdirectorios
+   - Se aplica al trabajar con archivos en este directorio
+   - Convenciones específicas para esta parte de la base de código
+```
+
+**Error típico:** un nuevo miembro del equipo no recibe las instrucciones del proyecto porque se colocaron en `~/.claude/CLAUDE.md` (nivel de usuario) en lugar de `.claude/CLAUDE.md` (nivel de proyecto).
+
+## 5.2 Sintaxis @path (importación de archivos)
+
+CLAUDE.md puede referenciar archivos externos usando sintaxis `@path`, haciendo la configuración modular:
+
+```markdown
+# CLAUDE.md del proyecto
+
+Los estándares de codificación se describen en @./standards/coding-style.md
+Los requisitos de pruebas están en @./standards/testing-requirements.md
+Descripción del proyecto en @README.md y dependencias en @package.json
+```
+
+**Reglas de sintaxis `@path`:**
+- Usa `@` directamente antes de la ruta del archivo (sin espacio)
+- Se soportan rutas relativas y absolutas
+- Las rutas relativas se resuelven relativas al archivo que las contiene
+- Profundidad máxima de importación anidada -- 5 niveles
+
+Esto evita duplicación y permite que cada paquete incluya solo los estándares relevantes.
+
+## 5.3 Directorio .claude/rules/
+
+`.claude/rules/` es una alternativa a un CLAUDE.md monolítico para organizar reglas por temas:
+
+```
+.claude/rules/
+  testing.md          -- convenciones de pruebas
+  api-conventions.md  -- convenciones de API
+  deployment.md       -- reglas de despliegue
+  react-patterns.md   -- patrones React
+```
+
+**Característica clave: Frontmatter YAML con campo `paths` para carga condicional:**
+
+```yaml
+---
+paths: ["src/api/**/*"]
+---
+
+Para archivos API usa async/await con manejo explícito de errores.
+Cada endpoint debe devolver un envoltorio de respuesta estándar.
+```
+
+```yaml
+---
+paths: ["**/*.test.tsx", "**/*.test.ts"]
+---
+
+Las pruebas deben usar bloques describe/it.
+Usa factories de datos en lugar de hardcode.
+No mockees la base de datos -- usa una BD de prueba.
+```
+
+**Cómo funciona:**
+- La regla se carga **solo** cuando Claude Code edita un archivo que coincide con el patrón `paths`
+- Esto ahorra contexto y tokens -- las reglas irrelevantes no se cargan
+- Los patrones glob permiten aplicar convenciones por tipo de archivo **independientemente de la ubicación** -- ideal para pruebas dispersas en toda la base de código
+
+**Cuándo usar `.claude/rules/` con paths vs CLAUDE.md a nivel de directorio:**
+- `.claude/rules/` con paths -- cuando las convenciones se aplican a archivos dispersos en muchos directorios (pruebas, migraciones)
+- CLAUDE.md a nivel de directorio -- cuando las convenciones están vinculadas a un directorio específico y no se necesitan fuera de él
+
+## 5.4 Comandos slash personalizados y Skills
+
+> **Nota:** en la versión actual de Claude Code, los comandos personalizados (`.claude/commands/`) se han fusionado con las habilidades (`.claude/skills/`). Ambos formatos crean comandos invocables mediante `/nombre`. La guía del examen hace referencia a `.claude/commands/` -- este formato aún se soporta.
+
+Los comandos slash son plantillas de prompts reutilizables invocables mediante `/nombre`:
+
+**Formato mediante `.claude/commands/` (legado, soportado):**
+```
+.claude/commands/
+  review.md        -- /review -- revisión de código estándar
+  test-gen.md      -- /test-gen -- generación de pruebas
+```
+
+**Formato mediante `.claude/skills/` (actual):**
+```
+.claude/skills/
+  review/SKILL.md  -- /review -- con configuración en frontmatter
+  test-gen/SKILL.md
+```
+
+**Comandos del proyecto** (`.claude/commands/` o `.claude/skills/`):
+- Se almacenan en VCS, disponibles para todos al clonar el repositorio
+- Proporcionan uniformidad en los flujos de trabajo del equipo
+
+**Comandos personalizados** (`~/.claude/commands/` o `~/.claude/skills/`):
+- Comandos personales, no transmitidos a través de VCS
+- Para flujos de trabajo individuales
+
+## 5.5 Habilidades (Skills) -- .claude/skills/
+
+Las habilidades son comandos extendidos con configuración mediante frontmatter de SKILL.md:
+
+```yaml
+---
+context: fork
+allowed-tools: ["Read", "Grep", "Glob"]
+argument-hint: "Ruta del directorio a analizar"
+---
+
+Analiza la estructura de código en el directorio especificado.
+Genera un reporte sobre dependencias y patrones arquitectónicos.
+```
+
+**Parámetros de frontmatter:**
+
+| Parámetro | Descripción |
+|---|---|
+| `context: fork` | Ejecuta la habilidad en un subagente aislado. La salida detallada no contamina la sesión principal |
+| `allowed-tools` | Restringe las herramientas disponibles (seguridad -- la habilidad no puede eliminar archivos si no está permitido) |
+| `argument-hint` | Pista que solicita un parámetro al invocar sin argumentos |
+
+**Cuándo usar habilidad vs CLAUDE.md:**
+- **Habilidad** -- invocación bajo demanda para una tarea específica (revisión, análisis, generación)
+- **CLAUDE.md** -- estándares y convenciones universales siempre cargados
+
+**Habilidades personales (`~/.claude/skills/`):**
+- Crea variantes personales con nombres diferentes para no afectar a colegas
+
+## 5.6 Modo de planificación (Plan Mode) vs ejecución directa
+
+**Modo de planificación:**
+- El modelo **solo** explora y planifica, sin realizar cambios
+- Utiliza Read, Grep, Glob para explorar la base de código
+- Resultado -- un plan de implementación, aprobado por el usuario
+- Exploración segura sin efectos secundarios
+
+**Cuándo usar modo de planificación:**
+- Cambios a gran escala (docenas de archivos)
+- Múltiples enfoques válidos (microservicios: ¿cómo dividir los límites?)
+- Decisiones arquitectónicas (¿qué framework? ¿qué estructura?)
+- Base de código desconocida (necesita comprensión antes del cambio)
+- Migraciones de librerías que afectan 45+ archivos
+
+**Cuándo usar ejecución directa:**
+- Correcciones de un solo archivo con stack trace claro
+- Agregar una sola verificación de validación
+- Cambios bien entendidos e inequívocos
+
+**Enfoque combinado:**
+1. Modo de planificación para exploración y diseño
+2. Aprobación del plan por el usuario
+3. Ejecución directa para implementar el plan aprobado
+
+**Subagente explore** -- subagente especializado para explorar la base de código:
+- Aísla la salida detallada del contexto principal
+- Devuelve solo un resumen
+- Previene el agotamiento de la ventana de contexto en tareas multifase
+
+## 5.7 Comando /compact
+
+`/compact` es un comando integrado para comprimir el contexto:
+- Sumariza el historial anterior, liberando espacio en la ventana de contexto
+- Se utiliza en sesiones largas de investigación cuando el contexto se llena con salida detallada de herramientas
+- Riesgo: se pierden valores numéricos exactos, fechas y detalles concretos durante la sumarización
+
+## 5.8 Comando /memory
+
+`/memory` es un comando integrado para gestionar la memoria entre sesiones:
+- Abre el archivo `CLAUDE.md` para edición, permitiendo guardar notas, preferencias y contexto
+- La información se preserva entre sesiones y se carga automáticamente al iniciar
+- Útil para almacenar: convenciones del proyecto, preferencias del usuario, comandos frecuentes, contexto del trabajo actual
+- Alternativa a repetir las mismas instrucciones en cada sesión
+
+## 5.9 Claude Code CLI para CI/CD
+
+**Bandera `-p` (o `--print`):**
+```bash
+claude -p "Analiza este pull request por problemas de seguridad"
+```
+- Modo no interactivo: procesa el prompt, imprime en stdout, finaliza
+- Sin espera de entrada del usuario
+- **La única forma correcta** de ejecutarse en pipelines CI/CD
+
+**Salida estructurada para CI:**
+```bash
+claude -p "Revisa este PR" --output-format json --json-schema '{"type":"object",...}'
+```
+- `--output-format json` -- salida en formato JSON
+- `--json-schema` -- validación de salida según esquema
+- El resultado se puede parsear para postear automáticamente comentarios inline en PRs
+
+**Aislamiento de contexto de sesión:**
+La misma sesión de Claude que **generó** el código es menos efectiva para su **revisión** (el modelo retiene el contexto de razonamiento y es menos propenso a cuestionar sus decisiones). Usa una **instancia independiente** para la revisión.
+
+**Prevención de comentarios duplicados:**
+Al revisar nuevamente después de nuevos commits -- incluye los resultados de revisión anteriores en el contexto e instruye a Claude que reporte solo problemas **nuevos o no corregidos**.
+
+## 5.10 fork_session y gestión de sesiones
+
+**`--resume <session-name>`** -- reanuda una sesión nombrada:
+```bash
+claude --resume investigation-auth-bug
+```
+- Continúa la conversación anterior con contexto guardado
+- Útil para investigaciones largas en múltiples sesiones
+- Riesgo: si los archivos han cambiado desde la sesión anterior, los resultados de las herramientas pueden estar obsoletos
+
+**`fork_session`** -- crear una rama independiente desde una base común:
+```
+Exploración de base de código
+         |
+    fork_session
+    /           \
+Enfoque A:      Enfoque B:
+Redux          Context API
+```
+
+- Ambas ramas heredan el contexto hasta el punto de bifurcación
+- Luego se desarrollan independientemente
+- Útil para comparar enfoques o probar estrategias
+
+**Cuándo iniciar una nueva sesión en lugar de reanudar:**
+- Los resultados de las herramientas están obsoletos (los archivos cambiaron)
+- Pasó mucho tiempo y el contexto se degradó
+- Es mejor comenzar con "Aquí hay un resumen de lo que descubrimos: ..." que reanudar con datos antiguos
+
+---
+
+# Capítulo 6: Ingeniería de prompts -- técnicas avanzadas
+
+> Documentación: [Ingeniería de prompts](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview) | [Anthropic Cookbook](https://github.com/anthropics/anthropic-cookbook)
+
+## 6.1 Prompting Few-shot
+
+Few-shot prompting incluye 2-4 ejemplos de entrada/salida en el prompt para demostrar el comportamiento esperado.
+
+**Por qué few-shot es más efectivo que descripciones textuales:**
+- Una descripción textual "sé más preciso" se interpreta de diferentes formas
+- Un ejemplo muestra inequívocamente el formato esperado y la lógica de decisión
+- El modelo generaliza el patrón a casos nuevos (no simplemente repite ejemplos)
+
+**Tipos de ejemplos few-shot y su aplicación:**
+
+1. **Ejemplos para escenarios ambiguos:**
+```
+Solicitud: "Mi pedido está roto"
+Acción: Llamar get_customer -> lookup_order -> verificar estado.
+Justificación: "roto" puede significar producto dañado. Necesita verificar detalles del pedido.
+
+Solicitud: "Dame un gerente"
+Acción: Llamar inmediatamente escalate_to_human.
+Justificación: El cliente solicita explícitamente a una persona. No intentes resolver solo.
+```
+
+2. **Ejemplos para formato de salida:**
+```
+Hallazgo de ejemplo:
+{
+  "location": "src/auth/login.ts:42",
+  "issue": "SQL injection en parámetro username",
+  "severity": "critical",
+  "suggested_fix": "Usar consulta parametrizada"
+}
+```
+
+3. **Ejemplos para distinguir código válido de problemático:**
+```
+// Válido (no marcar):
+const items = data.filter(x => x.active);
+
+// Problema (marcar):
+const items = data.filter(x => x.active == true); // Usa comparación estricta ===
+```
+
+4. **Ejemplos para extracción de diferentes formatos de documento:**
+```
+Documento con citas inline:
+"Como se muestra en el estudio (Smith, 2023), el nivel es del 42%."
+-> {"value": "42%", "source": "Smith, 2023", "type": "inline_citation"}
+
+Documento con bibliografía:
+"El nivel es del 42%. [1]"
+-> {"value": "42%", "source": "reference_1", "type": "bibliography"}
+```
+
+5. **Ejemplos para medidas informales (informal measurements):**
+```
+Texto: "aproximadamente dos puñados de arroz"
+-> {"amount": "~100g", "original_text": "dos puñados", "precision": "approximate"}
+
+Texto: "una pizca de sal"
+-> {"amount": "~1g", "original_text": "pizca", "precision": "approximate"}
+```
+Few-shot es especialmente efectivo para extraer medidas informales y no estándar, donde las reglas textuales no pueden cubrir toda la variedad de expresiones.
+
+**Reglas de normalización de formato en prompts:**
+Al usar esquemas JSON estrictos para salida estructurada, agrega reglas de normalización de formato al prompt:
+```
+Normalización:
+- Fechas: siempre ISO 8601 (YYYY-MM-DD), "ayer" -> calcular fecha absoluta
+- Moneda: valor numérico + código de moneda, "cinco dólares" -> {"amount": 5, "currency": "USD"}
+- Porcentajes: decimal, "mitad" -> 0.5
+```
+Esto previene errores semánticos cuando el esquema JSON es sintácticamente válido pero los valores son inconsistentes.
+
+## 6.2 Criterios explícitos vs instrucciones vagas
+
+**Incorrecto (vago):**
+```
+Verifica comentarios en el código por precisión.
+Sé conservador, reporta solo hallazgos de alta confianza.
+```
+
+**Correcto (criterios explícitos):**
+```
+Marca un comentario como problemático SOLO si:
+1. El comentario describe comportamiento que CONTRADICE el comportamiento real del código
+2. El comentario referencia una función o variable que no existe
+3. Un comentario TODO/FIXME para un bug que ya fue corregido en el código
+
+NO marques:
+- Comentarios que simplemente están anticuados estilísticamente
+- Comentarios con inexactitudes menores en la formulación
+- Ausencia de comentarios (esa es otra categoría)
+```
+
+**Definición de criterios de severidad con ejemplos:**
+```
+CRÍTICO: Fallo de runtime para usuarios
+  Ejemplo: NullPointerException al procesar pago
+
+ALTO: Vulnerabilidad de seguridad
+  Ejemplo: SQL injection, XSS, falta de verificación de permisos
+
+MEDIO: Error lógico sin efecto inmediato
+  Ejemplo: Ordenamiento incorrecto, error off-by-one
+
+BAJO: Calidad del código
+  Ejemplo: Duplicación, algoritmo no óptimo para datos pequeños
+```
+
+## 6.3 Prompt Chaining (cadenas de prompts)
+
+Prompt chaining es dividir una tarea compleja en pasos secuenciales enfocados:
+
+```
+Paso 1: Análisis del archivo auth.ts (solo problemas locales)
+       -> Resultado: lista de problemas en auth.ts
+
+Paso 2: Análisis del archivo database.ts (solo problemas locales)
+       -> Resultado: lista de problemas en database.ts
+
+Paso 3: Pase de integración (dependencias entre archivos)
+       -> Resultado: problemas en interfaces de módulos
+```
+
+**Por qué se necesita:**
+- Evita **dilución de atención (attention dilution)** -- cuando el modelo recibe demasiados archivos a la vez, puede perder bugs en unos mientras da comentarios superficiales en otros
+- Proporciona **calidad consistente** del análisis para cada archivo
+- Permite **análisis separado** de interacciones entre archivos
+
+**Cuándo usar prompt chaining vs descomposición dinámica:**
+- **Prompt chaining** -- para tareas predecibles y repetitivas (revisión de código, migración de archivos)
+- **Descomposición dinámica** -- para investigaciones abiertas donde las subtareas se vuelven claras solo durante el proceso
+
+## 6.4 Patrón "entrevista"
+
+Antes de implementar una solución, Claude hace preguntas aclaratorias al desarrollador:
+
+```
+Claude: "Antes de implementar el caché para la API, algunas preguntas:
+1. ¿Qué estrategia de invalidación de caché es preferible -- TTL o event-based?
+2. ¿Es aceptable tener datos obsoletos (stale) si el caché no está disponible?
+3. ¿Necesita cachear a nivel de usuarios individuales o globalmente?
+4. ¿Cuál es el volumen de datos esperado para cachear?"
+```
+
+**Cuándo es útil:**
+- Dominio desconocido (fintech, medicina, sistemas legales)
+- Tarea con implicaciones poco obvias (estrategias de caché, modos de fallo)
+- Múltiples enfoques válidos, cuya selección depende del contexto
+
+## 6.5 Validación y retry-with-feedback
+
+Cuando los datos extraídos no pasan la validación:
+
+```
+Paso 1: Extracción de datos del documento
+Paso 2: Validación (Pydantic, JSON Schema, reglas comerciales)
+Paso 3: Si hay error -- reintento con contexto:
+  - Documento original
+  - Extracción anterior (errónea)
+  - Error específico: "Campo 'total' = 150, pero suma de line_items = 145. Verifica valores."
+```
+
+**Cuándo el reintento será efectivo:**
+- Errores de formato (fecha en formato incorrecto)
+- Errores de estructura (campo en lugar incorrecto)
+- Discrepancias aritméticas (el modelo puede reverificar)
+
+**Cuándo el reintento NO ayudará:**
+- Información ausente en la fuente (no está en documento -- el reintento no la agregará)
+- Contexto externo (datos en otro documento no transmitido al modelo)
+
+**Pydantic como herramienta de validación:**
+Pydantic es una librería Python para validación de datos basada en esquemas. En el contexto del examen, lo importante es:
+- **Validación de estructura:** Pydantic verifica tipos de campos, obligatoriedad, valores permitidos (enum) a nivel de código después de obtener JSON de Claude
+- **Validación semántica:** Validadores personalizados verifican lógica comercial (suma de posiciones = total, fecha inicio < fecha fin)
+- **Ciclos validación/reintento:** Al error de validación Pydantic -- formamos mensaje de error y enviamos a Claude solicitud de reintento con contexto de error
+- **Generación de esquemas JSON:** Los modelos Pydantic pueden generar JSON Schema automáticamente para el parámetro `tool_use`, proporcionando una única fuente de verdad para el esquema
+
+## 6.6 Auto-corrección (Self-correction)
+
+Patrón para detectar contradicciones internas:
+
+```json
+{
+  "stated_total": "$150.00",
+  "calculated_total": "$145.00",
+  "conflict_detected": true,
+  "line_items": [
+    {"name": "Widget A", "price": 75.00},
+    {"name": "Widget B", "price": 70.00}
+  ]
+}
+```
+
+El modelo extrae **tanto** el valor declarado **como** el calculado -- si difieren, la bandera `conflict_detected` permite manejar la divergencia.
+
+---
+
+# Capítulo 7: Message Batches API
+
+> Documentación: [Message Batches](https://platform.claude.com/docs/en/build-with-claude/message-batches)
+
+## 7.1 Descripción general
+
+Message Batches API permite enviar paquetes de solicitudes para procesamiento asincrónico:
+
+| Característica | Valor |
+|---|---|
+| Ahorro | **50%** del costo de llamadas sincrónicas |
+| Ventana de procesamiento | Hasta **24 horas** (sin garantías SLA en latencia) |
+| Llamadas a herramientas multi-turn | **No soportado** (una solicitud = una respuesta) |
+| Correlación | Campo `custom_id` para vincular solicitud y respuesta |
+
+## 7.2 Cuándo usar Batch API vs API sincrónica
+
+**Regla:** cuando un error tiene consecuencias financieras, legales o de seguridad -- usa hooks, no prompts.
+
+# Capítulo 4: Model Context Protocol (MCP)
+
+> Documentación: [MCP](https://modelcontextprotocol.io/) | [Tools](https://modelcontextprotocol.io/docs/concepts/tools) | [Resources](https://modelcontextprotocol.io/docs/concepts/resources) | [Servers](https://modelcontextprotocol.io/docs/concepts/servers)
+
+## 4.1 ¿Qué es MCP?
+
+Model Context Protocol (MCP) es un protocolo abierto para conectar sistemas externos a Claude. MCP define tres tipos principales de recursos:
+
+1. **Tools (herramientas)** -- funciones que el agente puede llamar para ejecutar acciones (operaciones CRUD, llamadas API, ejecución de comandos)
+2. **Resources (recursos)** -- datos a los que el agente puede acceder para obtener contexto (documentación, esquemas de BD, catálogos de contenido)
+3. **Prompts (prompts)** -- plantillas de prompts predefinidas para tareas típicas
+
+---
+
+# Dominio 5: Gestión de contexto y confiabilidad (15%)
+
+## 5.1 Gestión de contexto para preservar información crítica
+
+### Conocimientos clave:
+- **Riesgos de sumarización progresiva**: condensación de valores numéricos, porcentajes, fechas en resúmenes vagos
+- Efecto **"lost-in-the-middle"**: los modelos procesan inicio y final confiablemente, pero pueden perder hallazgos del medio
+- Los resultados de herramientas se acumulan en contexto desproporcionalmente a relevancia
+- Importancia transmitir historial completo en solicitudes API subsecuentes
+
+### Habilidades clave:
+- Extraer hechos transaccionales a bloque permanente "case facts"
+- Recortar salida verbosa de herramientas a campos relevantes
+- Colocar hallazgos clave al inicio de datos agregados
+- Requerir a subagentes incluir metadatos (fechas, fuentes)
+
+---
+
+# Ejemplos de preguntas de examen
+
+## Pregunta 1 (Escenario: Agente de soporte al cliente)
+
+**Situación:** Los datos muestran que en 12% de casos el agente omite `get_customer` y solo llama `lookup_order` por nombre, resultando en devoluciones erróneas.
+
+**¿Cuál es el cambio más efectivo?**
+
+- A) Agregar precondición programática que bloquee `lookup_order` hasta obtener ID de `get_customer` **[CORRECTO]**
+- B) Mejorar el prompt del sistema
+- C) Agregar ejemplos few-shot
+- D) Implementar clasificador de enrutamiento
+
+**Por qué A:** Lógica comercial crítica requiere garantías determinísticas, que solo enfoques programáticos pueden dar.
+
+---
+
+## Pregunta 2 (Escenario: Agente de soporte al cliente)
+
+**Situación:** Agente frecuentemente llama `get_customer` en lugar de `lookup_order` para preguntas sobre pedidos. Las descripciones son mínimas y similares.
+
+**¿Cuál es el primer paso?**
+
+- A) Ejemplos few-shot
+- B) Expandir descripciones de cada herramienta con formatos, ejemplos y límites **[CORRECTO]**
+- C) Capa de enrutamiento
+- D) Combinar herramientas
+
+**Por qué B:** Descripciones son mecanismo principal de selección. Es solución de menor esfuerzo, más efectiva.
+
+---
+
+# Ejercicios prácticos
+
+## Ejercicio 1: Agente de soporte al cliente
+
+**Objetivo:** Hooks, precondiciones, escalada estructurada, manejo errores.
+
+**Pasos:**
+1. Crear agente con `get_customer`, `lookup_order`, `process_refund`, `escalate_to_human`
+2. Hook `PreToolUse` que bloquee `process_refund` > $500
+3. Precondición: `lookup_order` después de `get_customer` exitoso
+4. Simular múltiples coincidencias: solicitar IDs adicionales
+5. Escalar con estructura JSON: ID cliente, resumen, acciones, cantidad, causa
+
+**Dominios:** 1 (Arquitectura), 3 (Configuración), 5 (Contexto)
+
+---
+
+## Ejercicio 2: Configuración Claude Code
+
+**Objetivo:** CLAUDE.md jerárquico, rules path-specific, MCP.
+
+**Pasos:**
+1. CLAUDE.md con @path referencias
+2. Archivos `.claude/rules/` con glob-patrones
+3. Habilidades con `context: fork` y `allowed-tools`
+4. Servidor MCP en `.mcp.json`
+5. Prueba: modo planificación vs ejecución directa
+
+**Dominios:** 3 (Configuración), 2 (Herramientas)
+
+---
+
+## Ejercicio 3: Pipeline extracción datos
+
+**Objetivo:** JSON-schemas, tool_use, ciclos validación, procesamiento por lotes.
+
+**Pasos:**
+1. Herramienta con JSON-schema (required/optional, enum con "other")
+2. Ciclo validación con reintento
+3. Ejemplos few-shot para diferentes documentos
+4. Message Batches API para 100 documentos
+5. Enrutamiento a humano basado confianza
+
+**Dominios:** 4 (Ingeniería Prompts), 5 (Contexto)
+
+---
+
+# Apéndice: Tecnologías y conceptos
+
+| Tecnología | Aspectos clave |
+|---|---|
+| **Claude Agent SDK** | AgentDefinition, ciclos agentes, `stop_reason`, hooks, `allowedTools` |
+| **MCP** | Servidores, herramientas, recursos, `isError`, `.mcp.json` |
+| **Claude Code** | CLAUDE.md, `.claude/rules/`, `.claude/skills/`, modo planificación |
+| **Claude API** | `tool_use`, JSON-schemas, `tool_choice`, `stop_reason` |
+| **Message Batches API** | 50% ahorro, 24 horas, `custom_id`, sin multi-turn |
+| **Herramientas** | Read, Write, Edit, Bash, Grep, Glob |
+
+---
+
+# Temas fuera del alcance
+
+Los siguientes temas **NO** aparecerán en el examen:
+
+- Fine-tuning o entrenamiento de modelos personalizados
+- Autenticación, facturación o gestión de cuenta
+- Despliegue de servidores MCP
+- Arquitectura interna de Claude
+- Constitutional AI o RLHF
+- Streaming API o rate limiting
+- Configuraciones de nube específicas
+
+---
+
+# Recomendaciones para preparación
+
+1. **Crea un agente con Claude Agent SDK** -- ciclo completo con llamadas herramientas y manejo errores
+2. **Configura Claude Code para proyecto real** -- CLAUDE.md jerárquico con rules path-specific
+3. **Diseña herramientas MCP** -- descripciones claras, errores estructurados
+4. **Construye pipeline extracción datos** -- JSON-schemas, validación/reintento, batch processing
+5. **Practica ingeniería prompts** -- few-shot ejemplos, criterios explícitos
+6. **Estudia gestión contexto** -- scratchpad files, delegación subagentes
+7. **Entiende escalada y human-in-the-loop** -- criterios, procesos
+8. **Haz examen de prueba** antes del real
+
+---
+
+**Esta es la guía completa de certificación Claude Certified Architect, completamente traducida del ruso al español.**
+
+El documento incluye teoría fundamental, configuración práctica, estrategias avanzadas, dominios de examen, ejemplos de preguntas, ejercicios y recomendaciones de preparación.
