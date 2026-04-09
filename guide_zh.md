@@ -437,40 +437,6 @@ def enforce_refund_limit(tool_call):
 
 **规则：** 当失败有财务、法律或安全后果时——使用钩子，而非提示。
 
-## 3.6 `fork_session` 与会话管理
-
-**`--resume <session-name>`** 恢复命名会话：
-
-```bash
-claude --resume investigation-auth-bug
-```
-
-- 继续之前保存上下文的对话
-- 适用于跨多个会话的长期调查
-- 风险：如果自上次会话以来文件已更改，工具结果可能已过时
-
-**`fork_session`** 从共享上下文创建独立分支：
-
-```
-代码库调查
-         |
-    fork_session
-    /           \
-方法 A：         方法 B：
-Redux           Context API
-```
-
-- 两个分支继承分支点之前的上下文
-- 之后，它们独立分叉
-- 适用于比较方法或测试策略
-
-**何时启动新会话而非恢复：**
-- 工具结果已过时（文件已更改）
-- 已过很长时间，上下文已降级
-- 以"以下是我们发现的简短摘要：..."重新开始，比用旧工具数据恢复更可靠
-
----
-
 # 第 4 章：模型上下文协议（MCP）
 
 > 文档：[MCP](https://modelcontextprotocol.io/) | [工具](https://modelcontextprotocol.io/docs/concepts/tools) | [资源](https://modelcontextprotocol.io/docs/concepts/resources) | [服务器](https://modelcontextprotocol.io/docs/concepts/servers)
@@ -792,6 +758,40 @@ claude -p "Review this PR" --output-format json --json-schema '{"type":"object",
 
 **防止重复评论：**
 在新提交后重新审查时，将之前的审查结果包含在上下文中，并指示 Claude 仅报告新问题或未解决的问题。
+
+## 5.10 `fork_session` 与会话管理
+
+**`--resume <session-name>`** 恢复命名会话：
+
+```bash
+claude --resume investigation-auth-bug
+```
+
+- 继续之前保存上下文的对话
+- 适用于跨多个会话的长期调查
+- 风险：如果自上次会话以来文件已更改，工具结果可能已过时
+
+**`fork_session`** 从共享上下文创建独立分支：
+
+```
+代码库调查
+         |
+    fork_session
+    /           \
+方法 A：         方法 B：
+Redux           Context API
+```
+
+- 两个分支继承分支点之前的上下文
+- 之后，它们独立分叉
+- 适用于比较方法或测试策略
+
+**何时启动新会话而非恢复：**
+- 工具结果已过时（文件已更改）
+- 已过很长时间，上下文已降级
+- 以"以下是我们发现的简短摘要：..."重新开始，比用旧工具数据恢复更可靠
+
+---
 
 # 第6章：提示工程——高级技巧
 

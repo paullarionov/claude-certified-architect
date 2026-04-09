@@ -437,40 +437,6 @@ def enforce_refund_limit(tool_call):
 
 **Rule:** when failure has financial, legal, or safety consequences—use hooks, not prompts.
 
-## 3.6 `fork_session` and Session Management
-
-**`--resume <session-name>`** resumes a named session:
-
-```bash
-claude --resume investigation-auth-bug
-```
-
-- Continues a prior conversation with saved context
-- Useful for long investigations across multiple sessions
-- Risk: if files changed since the prior session, tool results may be stale
-
-**`fork_session`** creates an independent branch from shared context:
-
-```
-Codebase investigation
-         |
-    fork_session
-    /           \
-Approach A:      Approach B:
-Redux            Context API
-```
-
-- Both forks inherit context up to the branch point
-- Afterwards, they diverge independently
-- Useful for comparing approaches or testing strategies
-
-**When to start a new session instead of resuming:**
-- Tool results are stale (files changed)
-- A lot of time has passed and context has degraded
-- It is better to restart with “Here is a short summary of what we found: ...” than to resume with old tool data
-
----
-
 # Chapter 4: Model Context Protocol (MCP)
 
 > Documentation: [MCP](https://modelcontextprotocol.io/) | [Tools](https://modelcontextprotocol.io/docs/concepts/tools) | [Resources](https://modelcontextprotocol.io/docs/concepts/resources) | [Servers](https://modelcontextprotocol.io/docs/concepts/servers)
@@ -792,6 +758,38 @@ The same Claude session that generated code is often less effective at reviewing
 
 **Preventing duplicate comments:**
 When re-reviewing after new commits, include prior review results in context and instruct Claude to report only new or unresolved issues.
+
+## 5.10 `fork_session` and Session Management
+
+**`--resume <session-name>`** resumes a named session:
+
+```bash
+claude --resume investigation-auth-bug
+```
+
+- Continues a prior conversation with saved context
+- Useful for long investigations across multiple sessions
+- Risk: if files changed since the prior session, tool results may be stale
+
+**`fork_session`** creates an independent branch from shared context:
+
+```
+Codebase investigation
+         |
+    fork_session
+    /           \
+Approach A:      Approach B:
+Redux            Context API
+```
+
+- Both forks inherit context up to the branch point
+- Afterwards, they diverge independently
+- Useful for comparing approaches or testing strategies
+
+**When to start a new session instead of resuming:**
+- Tool results are stale (files changed)
+- A lot of time has passed and context has degraded
+- It is better to restart with "Here is a short summary of what we found: ..." than to resume with old tool data
 
 ---
 
