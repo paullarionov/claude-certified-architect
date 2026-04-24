@@ -33,7 +33,7 @@ El candidato ideal es un **arquitecto de soluciones (solution architect)** que d
 | Tipo de preguntas | Opción múltiple (1 correcta de 4) |
 | Puntuación | Escala 100-1000, puntuación de aprobación **720** |
 | Penalización por adivinanza | No (¡responde todas las preguntas!) |
-| Escenarios | 4 de 7 posibles (seleccionados al azar) |
+| Escenarios | 4 de 8 posibles (seleccionados al azar) |
 
 ---
 

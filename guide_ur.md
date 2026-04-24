@@ -33,7 +33,7 @@
 | سوال کی قسم | Multiple choice (4 میں سے 1 درست) |
 | اسکورنگ | 100–1000 scale، passing score **720** |
 | Guessing penalty | نہیں (ہر سوال کا جواب دیں!) |
-| Scenarios | 7 میں سے 4 (randomly selected) |
+| Scenarios | 8 میں سے 4 (randomly selected) |
 
 ---
 
@@ -2003,7 +2003,7 @@ Redux            Context API
 | سوال کی قسم | Multiple choice (4 میں سے 1 درست) |
 | اسکورنگ | 100–1000 scale، passing score **720** |
 | Guessing penalty | نہیں (ہر سوال کا جواب دیں!) |
-| Scenarios | 7 میں سے 4 (randomly selected) |
+| Scenarios | 8 میں سے 4 (randomly selected) |
 
 ---
 

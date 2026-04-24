@@ -33,7 +33,7 @@ The ideal candidate is a **solution architect** who designs and ships production
 | Question type | Multiple choice (1 correct out of 4) |
 | Scoring | 100–1000 scale, passing score **720** |
 | Guessing penalty | None (answer every question!) |
-| Scenarios | 4 out of 7 possible (randomly selected) |
+| Scenarios | 4 out of 8 possible (randomly selected) |
 
 ---
 
