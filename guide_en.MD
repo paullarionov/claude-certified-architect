@@ -33,7 +33,7 @@ The ideal candidate is a **solution architect** who designs and ships production
 | Question type | Multiple choice (1 correct out of 4) |
 | Scoring | 100–1000 scale, passing score **720** |
 | Guessing penalty | None (answer every question!) |
-| Scenarios | 4 out of 6 possible (randomly selected) |
+| Scenarios | 4 out of 8 possible (randomly selected) |
 
 ---
 
@@ -68,6 +68,12 @@ Integrate Claude Code into a CI/CD pipeline for automated code reviews, test gen
 
 ### Scenario 6: Structured Data Extraction
 The system extracts information from unstructured documents, validates output with JSON schemas, and maintains high accuracy. It must correctly handle edge cases.
+
+### Scenario 7: Conversational AI Architecture Patterns
+You design multi-turn conversational systems covering context window management, instruction persistence across turns, memory strategies, tool design for safe execution, and handling ambiguous or conflicting user inputs.
+
+### Scenario 8: Agentic AI Tools *(content missing — help us fill it in!)*
+This scenario has been reported by exam candidates but is not yet covered in this guide. If you have encountered questions from this scenario on the real exam, please share them in [GitHub Issues](https://github.com/paullarionov/claude-certified-architect/issues) so we can add full coverage. Your contribution will help everyone preparing for the exam.
 
 ---
 
@@ -3031,6 +3037,246 @@ When Edit fails due to a non-unique text match:
 - D) Add 10–15 examples of clear, unambiguous requests demonstrating correct tool choice for typical scenarios for each tool.
 
 **Why C:** Targeting few-shot examples at the specific ambiguous scenarios where errors occur, with explicit rationale for why one tool is preferable to alternatives, teaches the model the comparative decision process needed for edge cases. This is more effective than generic examples or declarative rules.
+
+---
+
+## Question 61 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Your `remove_team_member` tool uses a `dry_run: boolean` parameter for previewing impacts before execution. Production monitoring shows the agent bypasses the preview step by calling with `dry_run=false` directly. You need to ensure every removal is preceded by a preview that the user explicitly confirms.
+
+**What is the most reliable approach?**
+
+- A) Add server-side validation that permits `dry_run=false` only when a `dry_run=true` call with identical parameters occurred within the past 60 seconds.
+- B) Annotate the tool as requiring confirmation and configure the orchestration layer to prompt the user for approval before forwarding any calls to annotated tools.
+- C) Add detailed instructions and few-shot examples to the tool description requiring the agent to always call with `dry_run=true` first and wait for user confirmation before calling again.
+- D) Replace with two tools: `preview_remove_member` returns impact details and a single-use confirmation token; `execute_remove_member` requires that token, binding execution to the preview. **[CORRECT]**
+
+**Why D:** The two-tool token-binding approach makes it architecturally impossible to execute without a prior preview—the execute tool literally requires a token that only the preview tool can generate. This is the only approach that enforces the constraint at the code level rather than relying on LLM compliance with instructions (C), timing heuristics (A), or orchestration infrastructure (B).
+
+---
+
+## Question 62 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Production monitoring shows your `search_catalog` tool fails 12% of the time: 8% are network timeouts that succeed when retried, and 4% are query syntax errors that never succeed regardless of retries. Currently both error types are returned identically, causing wasted retries.
+
+**How should you modify the tool's error handling?**
+
+- A) Add few-shot examples to your system prompt demonstrating how to distinguish network errors from syntax errors.
+- B) Apply exponential backoff retry logic to all errors uniformly.
+- C) Implement automatic retry with backoff for network timeouts inside the tool; return syntax errors immediately with parameter validation details. **[CORRECT]**
+- D) Return all errors with a `retryable` boolean flag and error type details.
+
+**Why C:** Handling retries at the tool level for transient errors is the correct abstraction boundary—the tool has definitive knowledge of the error type and can implement deterministic retry logic without relying on the agent to interpret a flag (D) or follow prompt-level instructions (A). Uniform backoff (B) wastes time on syntax errors that will never succeed.
+
+---
+
+## Question 63 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Over several turns discussing investment strategy, a user stated "I have a very low risk tolerance" and later "I want to maximize my returns." They now ask: "What should I invest in?"
+
+**Which approach best ensures the recommendation aligns with the user's actual priority?**
+
+- A) Surface the contradiction and ask the user to clarify which matters more. **[CORRECT]**
+- B) Provide separate recommendations for both scenarios.
+- C) Proceed with the most recently stated preference.
+- D) Recommend a balanced portfolio without addressing the conflict.
+
+**Why A:** When user preferences directly contradict each other, surfacing the conflict and asking for clarification is the only way to guarantee the recommendation aligns with the user's true intent. Any other approach involves making an assumption that may be wrong—maximizing returns and low risk tolerance are fundamentally incompatible goals that require a human decision.
+
+---
+
+## Question 64 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Users refine playlist preferences over multiple conversation turns. Two messages after a user said "I love jazz," Claude asks "What genres do you enjoy?"
+
+**What is the most likely cause?**
+
+- A) Claude requires a vector database connection to maintain conversation memory.
+- B) The model's context window has been exceeded.
+- C) The Claude API requires a `session_id` parameter.
+- D) Your application isn't including prior messages in the `messages` array. **[CORRECT]**
+
+**Why D:** Claude has no server-side memory—every API call is stateless. Without including the full conversation history in the `messages` array of each request, Claude has no knowledge of prior turns. Vector databases (A) and `session_id` (C) are not part of Claude's architecture; context window overflow (B) is impossible for two-message exchanges.
+
+---
+
+## Question 65 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** After a 40-minute cooking session, the conversation reaches 78,000 tokens. History includes allergies, recipe scaling, clarified cooking terms, and general discussion. You must reduce tokens while preserving important information.
+
+**What approach best balances preservation with token reduction?**
+
+- A) Summarize the entire conversation history.
+- B) Keep only the most recent 20,000 tokens.
+- C) Extract critical structured data (allergies, quantities, preferences), summarize general discussion, and keep recent exchanges verbatim. **[CORRECT]**
+- D) Store the full conversation externally and retrieve relevant parts via semantic search.
+
+**Why C:** The hybrid approach preserves the highest-value information at the lowest cost. Critical facts like allergies and recipe quantities are extracted into a compact structured block (preventing the precision loss that occurs during summarization), general discussion is summarized, and recent exchanges are kept verbatim for conversational coherence. Options A and B risk losing critical dietary information; D is architectural overkill for a single cooking session.
+
+---
+
+## Question 66 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Users report that during extended conversations the assistant loses track of earlier topics and preferences. Your current implementation keeps only the last 25 message pairs.
+
+**What is the most effective solution?**
+
+- A) Hybrid approach: summarize older messages while keeping recent ones verbatim. **[CORRECT]**
+- B) Vector similarity search over the full conversation history.
+- C) Increase the window to 50 message pairs.
+- D) Summarize dropped messages every turn and prepend the running summary.
+
+**Why A:** The hybrid approach addresses both dimensions of the problem: retaining exact recent context (critical for conversational coherence) while maintaining a compressed representation of earlier preferences (preventing total loss when pairs are dropped). Increasing the window (C) simply delays the same problem. Vector search (B) may miss important context that isn't semantically similar to the current query. Full per-turn summarization (D) adds overhead and accumulates summarization errors.
+
+---
+
+## Question 67 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Users report that latency increases and costs rise when conversations exceed 50 turns.
+
+**What is the primary cause?**
+
+- A) The entire conversation history is included with each API request. **[CORRECT]**
+- B) The model generates progressively longer responses.
+- C) Database operations slow down as history grows.
+- D) The model builds an internal user profile requiring more processing.
+
+**Why A:** Claude's API is fully stateless—every request must include the complete conversation history in the `messages` array. As conversations grow, each request carries more tokens, which directly increases both processing latency and cost. The model does not maintain any internal state between calls (D is false), and response length is not inherently tied to conversation length (B).
+
+---
+
+## Question 68 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** After three months of weekly sessions, conversation history grows to 85,000 tokens. When a user asks "What did we conclude about the theme of isolation?", the assistant gives generic answers instead of referencing previous discussions.
+
+**What is the most effective approach?**
+
+- A) Rolling window truncation.
+- B) Progressive summarization capturing key conclusions.
+- C) Semantic embeddings with retrieval of relevant exchanges. **[CORRECT]**
+- D) Add structured XML tags marking discussion conclusions.
+
+**Why C:** Semantic search over conversation history is the only approach that scales to three months of discussion while being able to surface specific relevant exchanges on demand. Rolling window (A) would discard most of the history. Progressive summarization (B) compresses discussions into abstractions that lose the specific conclusions users are asking about. XML tags (D) require restructuring all past content and don't solve the retrieval problem at this scale.
+
+---
+
+## Question 69 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** During QA testing, Claude follows system prompt guidelines for the first 10–15 turns, but later responses deviate. The conversation is still within token limits.
+
+**What is the best solution?**
+
+- A) Move behavioral guidelines into the first user message.
+- B) Start a new conversation after 20 turns.
+- C) Insert user-role messages reinforcing guidelines at conversation breakpoints. **[CORRECT]**
+- D) Use post-response validation to regenerate non-compliant responses.
+
+**Why C:** Periodic injection of behavioral reminders directly combats instruction drift by re-establishing constraints at regular intervals as conversation history accumulates. Moving guidelines to the first user message (A) reduces their authority. Starting a new conversation (B) destroys context. Post-response validation (D) is corrective rather than preventive and adds significant latency.
+
+---
+
+## Question 70 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Your AI tutor has a 2,800-token system prompt defining teaching methodology and adaptation rules. After 12 turns, the assistant starts ignoring proficiency levels.
+
+**What is the most effective fix?**
+
+- A) Inject reminders every 4–5 turns.
+- B) Replace verbose rules with few-shot examples demonstrating proficiency-level adaptation. **[CORRECT]**
+- C) Place critical rules at the end of the system prompt.
+- D) Evaluate responses and regenerate if difficulty level mismatches.
+
+**Why B:** A 2,800-token system prompt with declarative rules is vulnerable to drift because abstract rules require the model to reason about them on every turn. Replacing verbose rules with concrete few-shot examples that demonstrate correct proficiency-level adaptation gives the model clear behavioral patterns to match—this is more reliably followed across many turns than abstract instructions. Reminder injection (A) helps but addresses symptoms; end-placement (C) helps initially but not with turn-level drift; regeneration (D) is expensive and corrective.
+
+---
+
+## Question 71 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Your assistant must maintain an enthusiastic tone, explain its reasoning, and ask clarifying questions. Where should these behavioral guidelines be defined?
+
+**Where should these behavioral guidelines be defined?**
+
+- A) Prepended to each user message.
+- B) In the system prompt. **[CORRECT]**
+- C) In the first assistant message.
+- D) In environment variables.
+
+**Why B:** The system prompt is specifically designed for persistent behavioral constraints and guidelines that apply throughout the entire conversation. Prepending to each user message (A) is redundant overhead. The first assistant message (C) is unreliable because the model can deviate from its own prior statements. Environment variables (D) have no effect on model behavior.
+
+---
+
+## Question 72 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Users report repetitive response openings like "Certainly!" and "I'd be happy to help!"
+
+**What is the most effective approach?**
+
+- A) Append a partial assistant message with a direct response opening. **[CORRECT]**
+- B) Lower the temperature setting.
+- C) Post-process responses to remove greetings.
+- D) Add system prompt instructions to avoid those phrases.
+
+**Why A:** Prefilling the assistant's response with the beginning of a direct answer prevents greeting patterns at the generation level—the model continues from the prefill rather than generating new opening phrases. System prompt instructions (D) can help but are less reliable since the model may still produce variants. Post-processing (C) is a fragile workaround. Temperature (B) controls randomness, not specific phrase patterns.
+
+---
+
+## Question 73 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** A webhook notifies your system that a user's package has shipped while the user is actively chatting. You want the assistant to incorporate this naturally into the next response.
+
+**What is the best approach?**
+
+- A) Add shipping status to the system prompt.
+- B) Send an immediate synthetic user message.
+- C) Force the assistant to call a status tool on each turn.
+- D) Append the status update as a prefix to the next user message. **[CORRECT]**
+
+**Why D:** Prefixing the status update to the next user message injects real-time context at a natural conversation boundary without disrupting the flow. Modifying the system prompt (A) requires rebuilding the session or is architecturally cumbersome. A synthetic user message (B) can break the natural dialogue flow and confuse attribution. Forcing a tool call each turn (C) is wasteful when events are rare.
+
+---
+
+## Question 74 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Users frequently send requests like "Book a venue for the party." The assistant asks 4+ clarifying questions, causing 35% abandonment.
+
+**What approach best improves the trade-off?**
+
+- A) Proceed with hidden defaults.
+- B) Ask all clarifying questions in one compound message.
+- C) State assumptions explicitly and proceed while inviting corrections. **[CORRECT]**
+- D) Use a structured intake form.
+
+**Why C:** Stating assumptions explicitly and proceeding gives the user an immediate, useful response while preserving their ability to correct wrong assumptions. Hidden defaults (A) leave the user unaware of what was assumed. A compound question list (B) still demands upfront effort from the user. A structured form (D) adds more friction, not less—contradicting the goal of reducing abandonment.
+
+---
+
+## Question 75 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Your assistant uses a contractor-persona system prompt. Early turns follow the rules, but by turn 7 the assistant gives generic advice. Conversation length is only 2,500 tokens.
+
+**What is the most likely cause?**
+
+- A) System prompts only establish initial behavior.
+- B) Model attention weakens as turns accumulate.
+- C) Accumulated assistant responses dilute system prompt influence. **[CORRECT]**
+- D) The system prompt is only sent once.
+
+**Why C:** As assistant responses accumulate in the conversation history, the proportion of text reflecting the system prompt's behavioral constraints decreases relative to the growing body of assistant-generated content. The model increasingly pattern-matches to its own prior outputs rather than the system prompt, compounding drift even at short token lengths. The system prompt is included in every API call (D is false as a standalone explanation), and model attention degradation (B) doesn't operate at 2,500 tokens.
+
+---
+
+## Question 76 (Scenario: Conversational AI Architecture Patterns)
+
+**Situation:** Users ask vague requests like "Can you help with the report?" The assistant responds by asking multiple questions (which report? what help? deadline?), causing 40% abandonment.
+
+**What is the best solution?**
+
+- A) Make reasonable assumptions, state them explicitly, and offer to adjust. **[CORRECT]**
+- B) Classify ambiguity with a smaller model before responding.
+- C) Use predefined interpretations without stating assumptions.
+- D) Limit the assistant to one clarifying question per turn.
+
+**Why A:** Proceeding with reasonable stated assumptions eliminates the back-and-forth entirely while keeping the user informed and in control. Predefined silent interpretations (C) leave users confused when the response doesn't match their intent. A single-question limit (D) still requires turns of back-and-forth. A smaller classification model (B) adds latency and infrastructure complexity without solving the core UX problem.
 
 ---
 

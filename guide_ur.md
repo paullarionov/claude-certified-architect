@@ -33,7 +33,7 @@
 | سوال کی قسم | Multiple choice (4 میں سے 1 درست) |
 | اسکورنگ | 100–1000 scale، passing score **720** |
 | Guessing penalty | نہیں (ہر سوال کا جواب دیں!) |
-| Scenarios | 6 میں سے 4 (randomly selected) |
+| Scenarios | 8 میں سے 4 (randomly selected) |
 
 ---
 
@@ -68,6 +68,12 @@ Claude Code کو CI/CD pipeline میں ضم کریں تاکہ automated code rev
 
 ### Scenario 6: Structured Data Extraction
 سسٹم غیر ساختہ دستاویزات سے معلومات نکالتا ہے، output کو JSON schemas کے ذریعے validate کرتا ہے، اور high accuracy برقرار رکھتا ہے۔ اسے edge cases کو درست طور پر سنبھالنا چاہیے۔
+
+### Scenario 7: Conversational AI Architecture Patterns
+آپ multi-turn conversational systems ڈیزائن کرتے ہیں جن میں context window management، متعدد turns میں instructions کا برقرار رہنا، memory strategies، محفوظ execution کے لیے tool design، اور مبہم یا متضاد user inputs کو سنبھالنا شامل ہے۔
+
+### Scenario 8: Agentic AI Tools *(مواد موجود نہیں — ہماری مدد کریں!)*
+اس scenario کی اطلاع امتحان دینے والے candidates نے دی ہے لیکن یہ ابھی تک اس guide میں شامل نہیں ہے۔ اگر آپ نے اصل امتحان میں اس scenario کے سوالات دیکھے ہیں، تو انہیں [GitHub Issues](https://github.com/paullarionov/claude-certified-architect/issues) میں share کریں تاکہ ہم مکمل coverage شامل کر سکیں۔ آپ کا تعاون ہر اس شخص کی مدد کرے گا جو امتحان کی تیاری کر رہا ہے۔
 
 ---
 
@@ -1997,7 +2003,7 @@ Redux            Context API
 | سوال کی قسم | Multiple choice (4 میں سے 1 درست) |
 | اسکورنگ | 100–1000 scale، passing score **720** |
 | Guessing penalty | نہیں (ہر سوال کا جواب دیں!) |
-| Scenarios | 6 میں سے 4 (randomly selected) |
+| Scenarios | 8 میں سے 4 (randomly selected) |
 
 ---
 
@@ -2032,6 +2038,12 @@ Claude Code کو CI/CD pipeline میں ضم کریں تاکہ automated code rev
 
 ### Scenario 6: Structured Data Extraction
 سسٹم غیر ساختہ دستاویزات سے معلومات نکالتا ہے، output کو JSON schemas کے ذریعے validate کرتا ہے، اور high accuracy برقرار رکھتا ہے۔ اسے edge cases درست طور پر سنبھالنے چاہئیں۔
+
+### Scenario 7: Conversational AI Architecture Patterns
+آپ multi-turn conversational systems ڈیزائن کرتے ہیں جن میں context window management، متعدد turns میں instructions کا برقرار رہنا، memory strategies، محفوظ execution کے لیے tool design، اور مبہم یا متضاد user inputs کو سنبھالنا شامل ہے۔
+
+### Scenario 8: Agentic AI Tools *(مواد موجود نہیں — ہماری مدد کریں!)*
+اس scenario کی اطلاع امتحان دینے والے candidates نے دی ہے لیکن یہ ابھی تک اس guide میں شامل نہیں ہے۔ اگر آپ نے اصل امتحان میں اس scenario کے سوالات دیکھے ہیں، تو انہیں [GitHub Issues](https://github.com/paullarionov/claude-certified-architect/issues) میں share کریں تاکہ ہم مکمل coverage شامل کر سکیں۔ آپ کا تعاون ہر اس شخص کی مدد کرے گا جو امتحان کی تیاری کر رہا ہے۔
 
 ---
 
@@ -2574,6 +2586,248 @@ Few-shot prompting، explicit criteria، prompt chaining، validation/retry loop
 ## ڈومین 5: Context Management اور Reliability (15%)
 
 Summarization risks، lost-in-the-middle، trimming tool output، confidence calibration، escalation، اور provenance preservation یاد رکھیں۔
+
+---
+
+# Scenario 7 کے مشق سوالات: Conversational AI Architecture Patterns
+
+## سوال 61
+
+**صورتحال:** آپ کے `remove_team_member` tool میں execution سے پہلے اثرات کا preview کرنے کے لیے `dry_run: boolean` parameter ہے۔ Production monitoring سے معلوم ہوتا ہے کہ agent براہ راست `dry_run=false` کے ساتھ call کر کے preview step کو bypass کرتا ہے۔ آپ کو یہ یقینی بنانا ہے کہ ہر deletion سے پہلے ایک preview ہو جسے user نے explicitly confirm کیا ہو۔
+
+**سب سے قابل اعتماد approach کونسی ہے؟**
+
+- A) Server-side validation شامل کریں جو `dry_run=false` صرف اسی وقت allow کرے جب پچھلے 60 seconds میں یکساں parameters کے ساتھ `dry_run=true` call ہوئی ہو۔
+- B) Tool کو confirmation کی ضرورت کے طور پر annotate کریں اور orchestration layer کو configure کریں کہ annotated tools کو calls forward کرنے سے پہلے user کی approval مانگے۔
+- C) Tool description میں تفصیلی instructions اور few-shot examples شامل کریں جن میں agent سے مطالبہ ہو کہ وہ ہمیشہ پہلے `dry_run=true` سے call کرے۔
+- D) دو tools سے replace کریں: `preview_remove_member` impact details اور ایک single-use confirmation token واپس کرتا ہے؛ `execute_remove_member` کو وہ token درکار ہے، execution کو preview سے bind کرتا ہے۔ **[درست]**
+
+**D کیوں:** Token-binding approach سے یہ architecturally ناممکن ہو جاتا ہے کہ پہلے preview کے بغیر execution ہو — execute tool کو literally وہ token چاہیے جو صرف preview tool ہی generate کر سکتا ہے۔ یہ واحد approach ہے جو LLM instructions کی پابندی (C)، timing heuristics (A)، یا orchestration infrastructure (B) پر انحصار کے بجائے code level پر constraint enforce کرتی ہے۔
+
+---
+
+## سوال 62
+
+**صورتحال:** Production monitoring سے معلوم ہوتا ہے کہ آپ کا `search_catalog` tool 12% وقت fail ہوتا ہے: 8% network timeouts ہیں جو retry پر کامیاب ہوتے ہیں، اور 4% query syntax errors ہیں جو کبھی کامیاب نہیں ہوتے۔ فی الحال دونوں error types یکساں طریقے سے return ہوتے ہیں، جس سے بے فائدہ retries ہوتی ہیں۔
+
+**آپ tool کی error handling کیسے modify کریں گے؟**
+
+- A) System prompt میں few-shot examples شامل کریں جو demonstrate کریں کہ network errors اور syntax errors میں فرق کیسے کریں۔
+- B) تمام errors پر uniformly exponential backoff retry logic apply کریں۔
+- C) Tool کے اندر network timeouts کے لیے automatic retry with backoff implement کریں؛ syntax errors کو parameter validation details کے ساتھ فوری واپس کریں۔ **[درست]**
+- D) تمام errors کو `retryable` boolean flag اور error type details کے ساتھ واپس کریں۔
+
+**C کیوں:** Tool level پر transient errors کے لیے retries handle کرنا صحیح abstraction boundary ہے — tool کو error type کے بارے میں یقینی علم ہے اور وہ deterministic retry logic implement کر سکتا ہے بغیر agent پر انحصار کے کہ وہ flag (D) interpret کرے یا prompt instructions (A) follow کرے۔ Uniform backoff (B) syntax errors پر وقت ضائع کرتا ہے جو کبھی کامیاب نہیں ہوں گے۔
+
+---
+
+## سوال 63
+
+**صورتحال:** Investment strategy کی گفتگو کے کئی turns میں، user نے کہا "میری risk tolerance بہت کم ہے" اور پھر "میں اپنے returns maximize کرنا چاہتا ہوں۔" اب وہ پوچھتا ہے: "مجھے کس چیز میں invest کرنا چاہیے؟"
+
+**کونسا approach سب سے بہتر طریقے سے یقینی بناتا ہے کہ recommendation user کی اصل priority سے ہم آہنگ ہو؟**
+
+- A) تضاد کو سامنے لائیں اور user سے پوچھیں کہ کونسی چیز زیادہ اہم ہے۔ **[درست]**
+- B) دونوں scenarios کے لیے الگ الگ recommendations فراہم کریں۔
+- C) سب سے حال میں بیان کی گئی preference کے ساتھ آگے بڑھیں۔
+- D) تضاد کو حل کیے بغیر balanced portfolio تجویز کریں۔
+
+**A کیوں:** جب user کی preferences براہ راست متضاد ہوں، تو تضاد سامنے لانا اور clarification مانگنا ہی واحد طریقہ ہے کہ recommendation user کے اصل ارادے سے ہم آہنگ ہو۔ Returns maximize کرنا اور low risk tolerance بنیادی طور پر ناقابل مطابقت اہداف ہیں جن کے لیے انسانی فیصلہ درکار ہے۔
+
+---
+
+## سوال 64
+
+**صورتحال:** Users کئی conversation turns میں playlist preferences refine کرتے ہیں۔ User کے "مجھے jazz پسند ہے" کہنے کے دو messages بعد، Claude پوچھتا ہے "آپ کو کون سے genres پسند ہیں؟"
+
+**سب سے زیادہ ممکنہ وجہ کیا ہے؟**
+
+- A) Claude کو conversation memory برقرار رکھنے کے لیے vector database connection درکار ہے۔
+- B) Model کی context window exceed ہو گئی ہے۔
+- C) Claude API کو `session_id` parameter درکار ہے۔
+- D) آپ کی application `messages` array میں پچھلے messages شامل نہیں کر رہی۔ **[درست]**
+
+**D کیوں:** Claude کے پاس server-side memory نہیں ہے — ہر API call stateless ہے۔ ہر request کے `messages` array میں مکمل conversation history شامل کیے بغیر، Claude کے پاس پچھلے turns کا کوئی علم نہیں ہوتا۔ Vector databases (A) اور `session_id` (C) Claude کے architecture کا حصہ نہیں ہیں؛ دو messages کے exchange کے لیے context window overflow (B) ناممکن ہے۔
+
+---
+
+## سوال 65
+
+**صورتحال:** 40 منٹ کے cooking session کے بعد، conversation 78,000 tokens تک پہنچ گئی ہے۔ History میں allergies، recipe scaling، clarified cooking terms، اور عمومی discussion شامل ہیں۔ آپ کو اہم معلومات محفوظ رکھتے ہوئے tokens کم کرنے ہیں۔
+
+**کونسا approach preservation اور token reduction کے درمیان بہترین توازن رکھتا ہے؟**
+
+- A) پوری conversation history کا خلاصہ کریں۔
+- B) صرف سب سے حالیہ 20,000 tokens رکھیں۔
+- C) اہم structured data (allergies، quantities، preferences) نکالیں، عمومی discussion کا خلاصہ کریں، اور حالیہ exchanges کو verbatim رکھیں۔ **[درست]**
+- D) مکمل conversation externally store کریں اور semantic search کے ذریعے متعلقہ حصے retrieve کریں۔
+
+**C کیوں:** Hybrid approach سب سے کم cost پر سب سے زیادہ valuable معلومات محفوظ رکھتی ہے۔ Allergies اور recipe quantities جیسے critical facts ایک compact structured block میں extract ہوتے ہیں (summarization کے دوران precision loss سے بچاتے ہوئے)، عمومی discussion summarize ہوتی ہے، اور حالیہ exchanges conversational coherence کے لیے verbatim رہتے ہیں۔ Options A اور B اہم dietary information کھو سکتے ہیں؛ D ایک cooking session کے لیے ضرورت سے زیادہ پیچیدہ ہے۔
+
+---
+
+## سوال 66
+
+**صورتحال:** Users رپورٹ کرتے ہیں کہ طویل conversations میں assistant پہلے کے topics اور preferences کا حساب کھو دیتا ہے۔ آپ کی موجودہ implementation صرف آخری 25 message pairs رکھتی ہے۔
+
+**سب سے مؤثر solution کیا ہے؟**
+
+- A) Hybrid approach: پرانے messages کا خلاصہ کرتے ہوئے حالیہ messages verbatim رکھیں۔ **[درست]**
+- B) مکمل conversation history پر vector similarity search۔
+- C) Window کو 50 message pairs تک بڑھائیں۔
+- D) ہر turn میں dropped messages کا خلاصہ کریں اور running summary آگے جوڑیں۔
+
+**A کیوں:** Hybrid approach مسئلے کے دونوں پہلوؤں کو حل کرتی ہے: exact recent context محفوظ رکھتی ہے (conversational coherence کے لیے اہم) جبکہ پہلے کی preferences کی compressed representation برقرار رکھتی ہے۔ Window بڑھانا (C) صرف اسی مسئلے کو ملتوی کرتا ہے۔ Vector search (B) اہم context کو miss کر سکتی ہے جو current query سے semantically مشابہ نہ ہو۔
+
+---
+
+## سوال 67
+
+**صورتحال:** Users رپورٹ کرتے ہیں کہ جب conversations 50 turns سے زیادہ ہوتے ہیں تو latency بڑھ جاتی ہے اور costs بھی۔
+
+**بنیادی وجہ کیا ہے؟**
+
+- A) ہر API request کے ساتھ پوری conversation history شامل ہوتی ہے۔ **[درست]**
+- B) Model gradually لمبے responses generate کرتا ہے۔
+- C) History بڑھنے کے ساتھ database operations سست ہو جاتے ہیں۔
+- D) Model زیادہ processing کی ضرورت والا internal user profile بناتا ہے۔
+
+**A کیوں:** Claude کی API مکمل طور پر stateless ہے — ہر request کو `messages` array میں پوری conversation history شامل کرنی ہوتی ہے۔ جیسے جیسے conversations بڑھتی ہیں، ہر request زیادہ tokens لے جاتی ہے، جو directly processing latency اور cost دونوں بڑھاتا ہے۔ Model calls کے درمیان کوئی internal state نہیں رکھتا (D غلط ہے)۔
+
+---
+
+## سوال 68
+
+**صورتحال:** تین مہینوں کے weekly sessions کے بعد، conversation history 85,000 tokens تک بڑھ گئی ہے۔ جب user پوچھتا ہے "ہم نے isolation کے theme کے بارے میں کیا نتیجہ اخذ کیا تھا؟"، تو assistant پچھلی discussions reference کرنے کے بجائے عام جوابات دیتا ہے۔
+
+**سب سے مؤثر approach کیا ہے؟**
+
+- A) Rolling window truncation۔
+- B) Key conclusions capture کرتے ہوئے progressive summarization۔
+- C) Relevant exchanges retrieve کرنے کے لیے semantic embeddings۔ **[درست]**
+- D) Discussion conclusions mark کرنے کے لیے structured XML tags شامل کریں۔
+
+**C کیوں:** Conversation history پر semantic search واحد approach ہے جو تین مہینوں کی discussion کو scale کر سکتی ہے جبکہ demand پر specific relevant exchanges surface کر سکتی ہے۔ Rolling window truncation (A) history کا بیشتر حصہ ضائع کر دے گی۔ Progressive summarization (B) discussions کو abstractions میں compress کرتی ہے، specific conclusions کھو دیتی ہے جن کے بارے میں users پوچھتے ہیں۔
+
+---
+
+## سوال 69
+
+**صورتحال:** QA testing کے دوران، Claude پہلے 10–15 turns میں system prompt guidelines follow کرتا ہے، لیکن بعد کے responses میں deviation آ جاتی ہے۔ Conversation ابھی token limits کے اندر ہے۔
+
+**بہترین solution کیا ہے؟**
+
+- A) Behavioral guidelines کو پہلے user message میں منتقل کریں۔
+- B) 20 turns کے بعد نئی conversation شروع کریں۔
+- C) Conversation breakpoints پر guidelines reinforce کرنے والے user-role messages insert کریں۔ **[درست]**
+- D) Non-compliant responses کو regenerate کرنے کے لیے post-response validation استعمال کریں۔
+
+**C کیوں:** Behavioral reminders کا periodic injection instruction drift کا براہ راست مقابلہ کرتا ہے، history accumulate ہونے کے ساتھ regular intervals پر constraints re-establish کر کے۔ Guidelines کو پہلے user message میں منتقل کرنا (A) ان کا authority کم کرتا ہے۔ Post-response validation (D) corrective ہے نہ کہ preventive اور significant latency شامل کرتی ہے۔
+
+---
+
+## سوال 70
+
+**صورتحال:** آپ کے AI tutor میں 2,800-token system prompt ہے جو teaching methodology اور adaptation rules define کرتا ہے۔ 12 turns کے بعد، assistant proficiency levels کو نظرانداز کرنا شروع کر دیتا ہے۔
+
+**سب سے مؤثر fix کیا ہے؟**
+
+- A) ہر 4–5 turns میں reminders inject کریں۔
+- B) Verbose rules کو proficiency-level adaptation demonstrate کرنے والے few-shot examples سے replace کریں۔ **[درست]**
+- C) Critical rules کو system prompt کے آخر میں رکھیں۔
+- D) Responses evaluate کریں اور اگر difficulty level match نہ ہو تو regenerate کریں۔
+
+**B کیوں:** Declarative rules والا 2,800-token system prompt drift کے لیے vulnerable ہے کیونکہ abstract rules ہر turn میں model سے reasoning کا تقاضا کرتے ہیں۔ Verbose rules کو concrete few-shot examples سے replace کرنا جو correct proficiency-level adaptation demonstrate کریں، model کو match کرنے کے لیے clear behavioral patterns دیتا ہے — یہ کئی turns میں abstract instructions سے زیادہ reliably follow ہوتا ہے۔
+
+---
+
+## سوال 71
+
+**صورتحال:** آپ کے assistant کو enthusiastic tone برقرار رکھنا، اپنی reasoning explain کرنا، اور clarifying questions پوچھنے ہیں۔ یہ behavioral guidelines کہاں define ہونی چاہئیں؟
+
+**یہ behavioral guidelines کہاں define ہونی چاہئیں؟**
+
+- A) ہر user message سے پہلے prepend کریں۔
+- B) System prompt میں۔ **[درست]**
+- C) پہلے assistant message میں۔
+- D) Environment variables میں۔
+
+**B کیوں:** System prompt خاص طور پر پوری conversation میں apply ہونے والی persistent behavioral constraints اور guidelines کے لیے ڈیزائن کیا گیا ہے۔ ہر user message سے پہلے شامل کرنا (A) redundant overhead ہے۔ پہلا assistant message (C) unreliable ہے کیونکہ model اپنے پہلے statements سے deviate کر سکتا ہے۔ Environment variables (D) model کے behavior پر اثر نہیں ڈالتے۔
+
+---
+
+## سوال 72
+
+**صورتحال:** Users repetitive response openings جیسے "یقیناً!" اور "میں مدد کرنے میں خوش ہوں!" رپورٹ کرتے ہیں۔
+
+**سب سے مؤثر approach کیا ہے؟**
+
+- A) Direct response opening کے ساتھ partial assistant message append کریں۔ **[درست]**
+- B) Temperature setting کم کریں۔
+- C) Greetings ہٹانے کے لیے responses کو post-process کریں۔
+- D) System prompt میں ان phrases سے بچنے کی instructions شامل کریں۔
+
+**A کیوں:** Assistant کے response کو direct جواب کی شروعات سے prefill کرنا generation level پر greeting patterns روکتا ہے — model prefill سے continue کرتا ہے بجائے نئے opening phrases generate کرنے کے۔ System prompt instructions (D) مدد کر سکتی ہیں لیکن کم reliable ہیں۔ Post-processing (C) ایک fragile workaround ہے۔ Temperature (B) randomness control کرتا ہے، specific phrase patterns نہیں۔
+
+---
+
+## سوال 73
+
+**صورتحال:** ایک webhook آپ کے system کو notify کرتا ہے کہ user کا package ship ہو گیا ہے جبکہ user actively chat کر رہا ہے۔ آپ چاہتے ہیں کہ assistant اسے اگلے response میں naturally شامل کرے۔
+
+**بہترین approach کیا ہے؟**
+
+- A) Shipping status کو system prompt میں شامل کریں۔
+- B) فوری synthetic user message بھیجیں۔
+- C) ہر turn میں assistant کو status tool call کرنے پر مجبور کریں۔
+- D) Status update کو اگلے user message کے prefix کے طور پر append کریں۔ **[درست]**
+
+**D کیوں:** Status update کو اگلے user message کے prefix کے طور پر شامل کرنا flow کو interrupt کیے بغیر natural conversation boundary پر real-time context inject کرتا ہے۔ System prompt modify کرنا (A) session rebuild کی ضرورت ہے۔ Synthetic user message (B) natural dialogue flow کو disrupt کر سکتا ہے۔ ہر turn میں tool call force کرنا (C) اس وقت wasteful ہے جب events rare ہوں۔
+
+---
+
+## سوال 74
+
+**صورتحال:** Users اکثر "پارٹی کے لیے venue book کریں" جیسے requests بھیجتے ہیں۔ Assistant 4+ clarifying questions پوچھتا ہے، جس سے 35% abandonment ہوتا ہے۔
+
+**کونسا approach trade-off کو بہترین طریقے سے improve کرتا ہے؟**
+
+- A) Hidden defaults کے ساتھ آگے بڑھیں۔
+- B) تمام clarifying questions ایک compound message میں پوچھیں۔
+- C) Assumptions explicitly بیان کریں اور corrections مدعو کرتے ہوئے آگے بڑھیں۔ **[درست]**
+- D) Structured intake form استعمال کریں۔
+
+**C کیوں:** Assumptions explicitly بیان کرنا اور آگے بڑھنا user کو فوری، مفید response دیتا ہے جبکہ غلط assumptions کو correct کرنے کی صلاحیت برقرار رکھتا ہے۔ Hidden defaults (A) user کو نہیں بتاتے کہ کیا assume کیا گیا۔ Compound question list (B) پھر بھی user سے upfront effort کا تقاضا کرتی ہے۔ Structured form (D) کم friction کی بجائے زیادہ شامل کرتا ہے۔
+
+---
+
+## سوال 75
+
+**صورتحال:** آپ کا assistant contractor-persona system prompt استعمال کرتا ہے۔ ابتدائی turns rules follow کرتے ہیں، لیکن turn 7 تک assistant generic advice دیتا ہے۔ Conversation length صرف 2,500 tokens ہے۔
+
+**سب سے زیادہ ممکنہ وجہ کیا ہے؟**
+
+- A) System prompts صرف initial behavior establish کرتے ہیں۔
+- B) Turns accumulate ہونے کے ساتھ model کی attention کمزور ہوتی ہے۔
+- C) Accumulated assistant responses system prompt کے اثر کو dilute کرتے ہیں۔ **[درست]**
+- D) System prompt صرف ایک بار بھیجا جاتا ہے۔
+
+**C کیوں:** جیسے جیسے conversation history میں assistant responses جمع ہوتے ہیں، system prompt کے behavioral constraints کو reflect کرنے والے text کا proportion بڑھتے ہوئے assistant-generated content کے relative کم ہوتا جاتا ہے۔ Model چھوٹے token lengths پر بھی system prompt instructions کے بجائے اپنے پہلے outputs کے patterns کو زیادہ follow کرتا ہے، drift کو compound کرتا ہے۔
+
+---
+
+## سوال 76
+
+**صورتحال:** Users مبہم requests کرتے ہیں جیسے "کیا آپ report میں مدد کر سکتے ہیں؟" Assistant کئی سوالات پوچھ کر respond کرتا ہے (کون سی report؟ کیا مدد؟ deadline کیا ہے؟)، جس سے 40% abandonment ہوتا ہے۔
+
+**بہترین solution کیا ہے؟**
+
+- A) Reasonable assumptions کریں، انہیں explicitly بیان کریں، اور adjustments کی پیشکش کریں۔ **[درست]**
+- B) Respond کرنے سے پہلے smaller model کے ساتھ ambiguity classify کریں۔
+- C) Assumptions بیان کیے بغیر predefined interpretations استعمال کریں۔
+- D) Assistant کو ہر turn میں ایک clarifying question تک محدود کریں۔
+
+**A کیوں:** Reasonable stated assumptions کے ساتھ آگے بڑھنا user کو informed اور in control رکھتے ہوئے back-and-forth کو مکمل طور پر ختم کرتا ہے۔ Silent predefined interpretations (C) users کو confuse کرتی ہیں جب response ان کے ارادے سے match نہ ہو۔ One-question limit (D) پھر بھی back-and-forth turns کی ضرورت ہے۔ Smaller classification model (B) core UX مسئلہ حل کیے بغیر latency اور infrastructure complexity شامل کرتا ہے۔
 
 ---
 

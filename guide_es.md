@@ -33,7 +33,7 @@ El candidato ideal es un **arquitecto de soluciones (solution architect)** que d
 | Tipo de preguntas | Opción múltiple (1 correcta de 4) |
 | Puntuación | Escala 100-1000, puntuación de aprobación **720** |
 | Penalización por adivinanza | No (¡responde todas las preguntas!) |
-| Escenarios | 4 de 6 posibles (seleccionados al azar) |
+| Escenarios | 4 de 8 posibles (seleccionados al azar) |
 
 ---
 
@@ -68,6 +68,12 @@ Integración de Claude Code en pipelines CI/CD para revisión automática de có
 
 ### Escenario 6: Extracción de datos estructurados
 El sistema extrae información de documentos no estructurados, valida el resultado usando esquemas JSON y mantiene alta precisión. Debe manejar correctamente casos límite.
+
+### Escenario 7: Patrones de arquitectura de IA conversacional
+Diseñas sistemas conversacionales de múltiples turnos que cubren gestión de ventana de contexto, persistencia de instrucciones a lo largo de los turnos, estrategias de memoria, diseño de herramientas para ejecución segura y manejo de entradas de usuario ambiguas o contradictorias.
+
+### Escenario 8: Herramientas de IA agéntica *(contenido faltante — ¡ayúdanos a completarlo!)*
+Este escenario ha sido reportado por candidatos del examen pero aún no está cubierto en esta guía. Si has encontrado preguntas de este escenario en el examen real, compártelas en [GitHub Issues](https://github.com/paullarionov/claude-certified-architect/issues) para que podamos añadir cobertura completa. Tu contribución ayudará a todos los que se preparan para el examen.
 
 ---
 
@@ -2463,6 +2469,246 @@ Model Context Protocol (MCP) es un protocolo abierto para conectar sistemas exte
 - D) Combinar herramientas
 
 **Por qué B:** Descripciones son mecanismo principal de selección. Es solución de menor esfuerzo, más efectiva.
+
+---
+
+## Pregunta 61 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Tu herramienta `remove_team_member` usa un parámetro `dry_run: boolean` para previsualizar impactos antes de ejecutar. El monitoreo de producción muestra que el agente omite el paso de previsualización y llama directamente con `dry_run=false`. Necesitas garantizar que cada eliminación esté precedida por una previsualización que el usuario confirme explícitamente.
+
+**¿Cuál es el enfoque más confiable?**
+
+- A) Agregar validación en el servidor que permita `dry_run=false` solo cuando una llamada con `dry_run=true` con parámetros idénticos ocurrió en los últimos 60 segundos.
+- B) Anotar la herramienta como que requiere confirmación y configurar la capa de orquestación para solicitar aprobación del usuario antes de reenviar llamadas a herramientas anotadas.
+- C) Agregar instrucciones detalladas y ejemplos few-shot en la descripción de la herramienta exigiendo que el agente siempre llame primero con `dry_run=true` y espere la confirmación del usuario.
+- D) Reemplazar con dos herramientas: `preview_remove_member` devuelve detalles del impacto y un token de confirmación de uso único; `execute_remove_member` requiere ese token, vinculando la ejecución a la previsualización. **[CORRECTA]**
+
+**Por qué D:** El enfoque de vinculación por token hace arquitectónicamente imposible ejecutar sin una previsualización previa. La herramienta de ejecución literalmente requiere un token que solo la herramienta de previsualización puede generar. Es el único enfoque que aplica la restricción a nivel de código, no dependiendo del cumplimiento de instrucciones por el LLM (C), heurísticas de tiempo (A) o infraestructura de orquestación (B).
+
+---
+
+## Pregunta 62 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** El monitoreo de producción muestra que tu herramienta `search_catalog` falla el 12% del tiempo: el 8% son tiempos de espera de red que tienen éxito al reintentarse, y el 4% son errores de sintaxis de consulta que nunca tienen éxito. Actualmente ambos tipos de error se devuelven de forma idéntica, causando reintentos desperdiciados.
+
+**¿Cómo deberías modificar el manejo de errores de la herramienta?**
+
+- A) Agregar ejemplos few-shot al prompt del sistema demostrando cómo distinguir errores de red de errores de sintaxis.
+- B) Aplicar lógica de reintento con retroceso exponencial uniformemente a todos los errores.
+- C) Implementar reintento automático con retroceso para tiempos de espera de red dentro de la herramienta; devolver errores de sintaxis inmediatamente con detalles de validación de parámetros. **[CORRECTA]**
+- D) Devolver todos los errores con un indicador booleano `retryable` y detalles del tipo de error.
+
+**Por qué C:** Manejar reintentos a nivel de la herramienta para errores transitorios es la abstracción correcta—la herramienta tiene conocimiento definitivo del tipo de error y puede implementar lógica de reintento determinista sin depender del agente para interpretar un indicador (D) o seguir instrucciones del prompt (A). El retroceso uniforme (B) desperdicia tiempo en errores de sintaxis que nunca tendrán éxito.
+
+---
+
+## Pregunta 63 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** En varios turnos discutiendo estrategia de inversión, un usuario declaró "Tengo una tolerancia al riesgo muy baja" y luego "Quiero maximizar mis retornos." Ahora pregunta: "¿En qué debería invertir?"
+
+**¿Qué enfoque garantiza mejor que la recomendación se alinee con la prioridad real del usuario?**
+
+- A) Sacar a la luz la contradicción y pedir al usuario que aclare qué importa más. **[CORRECTA]**
+- B) Proporcionar recomendaciones separadas para ambos escenarios.
+- C) Proceder con la preferencia declarada más recientemente.
+- D) Recomendar una cartera equilibrada sin abordar el conflicto.
+
+**Por qué A:** Cuando las preferencias del usuario se contradicen directamente, sacar a la luz el conflicto y pedir aclaración es la única forma de garantizar que la recomendación se alinee con la verdadera intención del usuario. Maximizar retornos y tolerancia al riesgo baja son objetivos fundamentalmente incompatibles que requieren una decisión humana.
+
+---
+
+## Pregunta 64 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Los usuarios refinan preferencias de playlist a lo largo de múltiples turnos. Dos mensajes después de que un usuario dijo "Me encanta el jazz," Claude pregunta "¿Qué géneros disfrutas?"
+
+**¿Cuál es la causa más probable?**
+
+- A) Claude requiere una conexión a base de datos vectorial para mantener memoria de conversación.
+- B) La ventana de contexto del modelo ha sido excedida.
+- C) La API de Claude requiere un parámetro `session_id`.
+- D) Tu aplicación no está incluyendo mensajes anteriores en el array `messages`. **[CORRECTA]**
+
+**Por qué D:** Claude no tiene memoria del lado del servidor—cada llamada a la API es sin estado. Sin incluir el historial completo de conversación en el array `messages` de cada solicitud, Claude no tiene conocimiento de turnos anteriores. Las bases de datos vectoriales (A) y `session_id` (C) no son parte de la arquitectura de Claude; el desbordamiento de ventana de contexto (B) es imposible para intercambios de dos mensajes.
+
+---
+
+## Pregunta 65 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Después de una sesión de cocina de 40 minutos, la conversación alcanza 78,000 tokens. El historial incluye alergias, escalado de recetas, términos de cocina aclarados y discusión general. Debes reducir tokens preservando información importante.
+
+**¿Qué enfoque equilibra mejor la preservación con la reducción de tokens?**
+
+- A) Resumir todo el historial de conversación.
+- B) Conservar solo los 20,000 tokens más recientes.
+- C) Extraer datos estructurados críticos (alergias, cantidades, preferencias), resumir la discusión general y mantener los intercambios recientes literalmente. **[CORRECTA]**
+- D) Almacenar la conversación completa externamente y recuperar partes relevantes mediante búsqueda semántica.
+
+**Por qué C:** El enfoque híbrido preserva la información de mayor valor al menor costo. Los hechos críticos como alergias y cantidades de recetas se extraen en un bloque estructurado compacto (previniendo la pérdida de precisión que ocurre durante la resumición), la discusión general se resume, y los intercambios recientes se mantienen literalmente para la coherencia conversacional. Las opciones A y B arriesgan perder información dietética crítica; D es excesiva para una sola sesión de cocina.
+
+---
+
+## Pregunta 66 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Los usuarios reportan que durante conversaciones extendidas el asistente pierde el rastro de temas y preferencias anteriores. Tu implementación actual conserva solo los últimos 25 pares de mensajes.
+
+**¿Cuál es la solución más efectiva?**
+
+- A) Enfoque híbrido: resumir mensajes más antiguos mientras se mantienen los recientes literalmente. **[CORRECTA]**
+- B) Búsqueda de similitud vectorial sobre el historial completo de conversación.
+- C) Aumentar la ventana a 50 pares de mensajes.
+- D) Resumir mensajes eliminados en cada turno y anteponer el resumen acumulado.
+
+**Por qué A:** El enfoque híbrido aborda ambas dimensiones del problema: retener contexto reciente exacto (crítico para la coherencia conversacional) mientras se mantiene una representación comprimida de preferencias anteriores. Aumentar la ventana (C) simplemente retrasa el mismo problema. La búsqueda vectorial (B) puede perder contexto importante que no es semánticamente similar a la consulta actual.
+
+---
+
+## Pregunta 67 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Los usuarios reportan que la latencia aumenta y los costos suben cuando las conversaciones superan los 50 turnos.
+
+**¿Cuál es la causa principal?**
+
+- A) Todo el historial de conversación se incluye con cada solicitud a la API. **[CORRECTA]**
+- B) El modelo genera respuestas progresivamente más largas.
+- C) Las operaciones de base de datos se ralentizan a medida que crece el historial.
+- D) El modelo construye un perfil de usuario interno que requiere más procesamiento.
+
+**Por qué A:** La API de Claude es completamente sin estado—cada solicitud debe incluir el historial completo de conversación en el array `messages`. A medida que las conversaciones crecen, cada solicitud lleva más tokens, lo que aumenta directamente tanto la latencia de procesamiento como el costo. El modelo no mantiene ningún estado interno entre llamadas (D es falso).
+
+---
+
+## Pregunta 68 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Después de tres meses de sesiones semanales, el historial de conversación crece a 85,000 tokens. Cuando un usuario pregunta "¿Qué concluimos sobre el tema del aislamiento?", el asistente da respuestas genéricas en lugar de referenciar discusiones anteriores.
+
+**¿Cuál es el enfoque más efectivo?**
+
+- A) Truncamiento de ventana deslizante.
+- B) Resumición progresiva capturando conclusiones clave.
+- C) Embeddings semánticos con recuperación de intercambios relevantes. **[CORRECTA]**
+- D) Agregar etiquetas XML estructuradas marcando conclusiones de discusión.
+
+**Por qué C:** La búsqueda semántica sobre el historial de conversación es el único enfoque que escala a tres meses de discusión mientras puede sacar a la luz intercambios relevantes específicos a demanda. El truncamiento deslizante (A) descartaría la mayoría del historial. La resumición progresiva (B) comprime las discusiones en abstracciones que pierden las conclusiones específicas que los usuarios buscan.
+
+---
+
+## Pregunta 69 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Durante las pruebas de QA, Claude sigue las pautas del prompt del sistema durante los primeros 10–15 turnos, pero las respuestas posteriores se desvían. La conversación sigue dentro de los límites de tokens.
+
+**¿Cuál es la mejor solución?**
+
+- A) Mover las pautas de comportamiento al primer mensaje del usuario.
+- B) Iniciar una nueva conversación después de 20 turnos.
+- C) Insertar mensajes de rol de usuario reforzando las pautas en puntos de interrupción de la conversación. **[CORRECTA]**
+- D) Usar validación post-respuesta para regenerar respuestas no conformes.
+
+**Por qué C:** La inyección periódica de recordatorios de comportamiento combate directamente la deriva de instrucciones reestableciendo restricciones a intervalos regulares a medida que se acumula el historial. Mover las pautas al primer mensaje del usuario (A) reduce su autoridad. La validación post-respuesta (D) es correctiva en lugar de preventiva y añade latencia significativa.
+
+---
+
+## Pregunta 70 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Tu tutor de IA tiene un prompt del sistema de 2,800 tokens que define metodología de enseñanza y reglas de adaptación. Después de 12 turnos, el asistente comienza a ignorar los niveles de competencia.
+
+**¿Cuál es la corrección más efectiva?**
+
+- A) Inyectar recordatorios cada 4–5 turnos.
+- B) Reemplazar reglas verbosas con ejemplos few-shot que demuestren adaptación por nivel de competencia. **[CORRECTA]**
+- C) Colocar las reglas críticas al final del prompt del sistema.
+- D) Evaluar respuestas y regenerar si el nivel de dificultad no coincide.
+
+**Por qué B:** Un prompt del sistema de 2,800 tokens con reglas declarativas es vulnerable a la deriva porque las reglas abstractas requieren que el modelo razone sobre ellas en cada turno. Reemplazar reglas verbosas con ejemplos few-shot concretos que demuestran la adaptación correcta por nivel de competencia da al modelo patrones de comportamiento claros para seguir—esto se cumple más confiablemente a lo largo de muchos turnos que las instrucciones abstractas.
+
+---
+
+## Pregunta 71 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Tu asistente debe mantener un tono entusiasta, explicar su razonamiento y hacer preguntas aclaratorias. ¿Dónde deben definirse estas pautas de comportamiento?
+
+**¿Dónde deben definirse estas pautas de comportamiento?**
+
+- A) Antepuestas a cada mensaje del usuario.
+- B) En el prompt del sistema. **[CORRECTA]**
+- C) En el primer mensaje del asistente.
+- D) En variables de entorno.
+
+**Por qué B:** El prompt del sistema está específicamente diseñado para restricciones y pautas de comportamiento persistentes que aplican a lo largo de toda la conversación. Anteponer a cada mensaje del usuario (A) es sobrecarga redundante. El primer mensaje del asistente (C) es poco confiable porque el modelo puede desviarse de sus propias declaraciones anteriores. Las variables de entorno (D) no tienen efecto en el comportamiento del modelo.
+
+---
+
+## Pregunta 72 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Los usuarios reportan aperturas de respuesta repetitivas como "¡Claro!" y "¡Con gusto te ayudo!"
+
+**¿Cuál es el enfoque más efectivo?**
+
+- A) Anteponer un mensaje de asistente parcial con una apertura de respuesta directa. **[CORRECTA]**
+- B) Reducir la configuración de temperatura.
+- C) Post-procesar respuestas para eliminar saludos.
+- D) Agregar instrucciones al prompt del sistema para evitar esas frases.
+
+**Por qué A:** Prellenar la respuesta del asistente con el inicio de una respuesta directa previene los patrones de saludo a nivel de generación—el modelo continúa desde el prellenado en lugar de generar nuevas frases de apertura. Las instrucciones del prompt del sistema (D) pueden ayudar pero son menos confiables. El post-procesamiento (C) es una solución frágil. La temperatura (B) controla la aleatoriedad, no patrones de frases específicos.
+
+---
+
+## Pregunta 73 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Un webhook notifica a tu sistema que el paquete de un usuario ha sido enviado mientras el usuario está chateando activamente. Quieres que el asistente incorpore esto naturalmente en la siguiente respuesta.
+
+**¿Cuál es el mejor enfoque?**
+
+- A) Agregar el estado de envío al prompt del sistema.
+- B) Enviar un mensaje sintético de usuario inmediato.
+- C) Forzar al asistente a llamar a una herramienta de estado en cada turno.
+- D) Anteponer la actualización de estado como prefijo al siguiente mensaje del usuario. **[CORRECTA]**
+
+**Por qué D:** Prefijar la actualización de estado al siguiente mensaje del usuario inyecta contexto en tiempo real en un límite de conversación natural sin interrumpir el flujo. Modificar el prompt del sistema (A) requiere reconstruir la sesión. Un mensaje sintético de usuario (B) puede romper el flujo natural del diálogo. Forzar una llamada de herramienta en cada turno (C) es costoso cuando los eventos son raros.
+
+---
+
+## Pregunta 74 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Los usuarios frecuentemente envían solicitudes como "Reserva un lugar para la fiesta." El asistente hace 4+ preguntas aclaratorias, causando un 35% de abandono.
+
+**¿Qué enfoque mejora mejor el equilibrio?**
+
+- A) Proceder con valores predeterminados ocultos.
+- B) Hacer todas las preguntas aclaratorias en un mensaje compuesto.
+- C) Declarar suposiciones explícitamente y proceder invitando correcciones. **[CORRECTA]**
+- D) Usar un formulario de admisión estructurado.
+
+**Por qué C:** Declarar suposiciones explícitamente y proceder le da al usuario una respuesta inmediata y útil mientras preserva su capacidad de corregir suposiciones incorrectas. Los valores predeterminados ocultos (A) dejan al usuario sin saber qué se asumió. Una lista de preguntas compuesta (B) sigue demandando esfuerzo inicial del usuario. Un formulario estructurado (D) agrega más fricción, no menos.
+
+---
+
+## Pregunta 75 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Tu asistente usa un prompt del sistema con persona de contratista. Los turnos iniciales siguen las reglas, pero para el turno 7 el asistente da consejos genéricos. La longitud de conversación es solo 2,500 tokens.
+
+**¿Cuál es la causa más probable?**
+
+- A) Los prompts del sistema solo establecen el comportamiento inicial.
+- B) La atención del modelo se debilita a medida que se acumulan los turnos.
+- C) Las respuestas acumuladas del asistente diluyen la influencia del prompt del sistema. **[CORRECTA]**
+- D) El prompt del sistema solo se envía una vez.
+
+**Por qué C:** A medida que las respuestas del asistente se acumulan en el historial de conversación, la proporción de texto que refleja las restricciones de comportamiento del prompt del sistema disminuye en relación al cuerpo creciente de contenido generado por el asistente. El modelo cada vez más sigue el patrón de sus propias salidas anteriores en lugar de las instrucciones del prompt del sistema, compounding la deriva incluso en longitudes de token cortas.
+
+---
+
+## Pregunta 76 (Escenario: Patrones de arquitectura de IA conversacional)
+
+**Situación:** Los usuarios hacen solicitudes vagas como "¿Puedes ayudar con el informe?" El asistente responde preguntando múltiples preguntas (¿qué informe? ¿qué ayuda? ¿cuál es el plazo?), causando un 40% de abandono.
+
+**¿Cuál es la mejor solución?**
+
+- A) Hacer suposiciones razonables, declararlas explícitamente y ofrecer ajustes. **[CORRECTA]**
+- B) Clasificar la ambigüedad con un modelo más pequeño antes de responder.
+- C) Usar interpretaciones predefinidas sin declarar suposiciones.
+- D) Limitar al asistente a una pregunta aclaratoria por turno.
+
+**Por qué A:** Proceder con suposiciones declaradas razonables elimina el intercambio de ida y vuelta por completo mientras mantiene al usuario informado y en control. Las interpretaciones silenciosas predefinidas (C) confunden a los usuarios cuando la respuesta no coincide con su intención. Un límite de una pregunta (D) sigue requiriendo turnos de ida y vuelta. Un modelo de clasificación más pequeño (B) agrega latencia y complejidad de infraestructura sin resolver el problema central de UX.
 
 ---
 
