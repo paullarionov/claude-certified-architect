@@ -3303,3 +3303,319 @@ Cuando Edit falla por falta de coincidencia de texto único:
 - Riesgo de descomposición demasiado granular de tareas por coordinador
 
 ### Habilidades clave:
+
+- Implementar coordinador que descompone tareas, genera subagentes a través de `Task`, transmite contexto explícitamente en prompts
+- Agregación de resultados de múltiples subagentes, manejo de fallos parciales
+- Validación de outputs de subagentes
+
+## 1.3 Manejo de ciclos agentes fallidos
+
+### Conocimientos clave:
+- Cuando `stop_reason` es `"max_tokens"`, la respuesta se trunca -- aumentar `max_tokens` o dividir tarea
+- Recuperación de fallos de herramientas vs fallos semánticos
+- Distinguir entre errores transitorios (reintentar) vs business logic errors (propagar/escalar)
+
+### Habilidades clave:
+- Implementar manejo de max_tokens: detectar, aumentar límite, reintentar
+- Categorizar fallos por tipo, tomar decisión de reintento vs propagación
+
+---
+
+# Dominio 2: Diseño de herramientas e integración MCP (18%)
+
+## 2.1 Diseño de esquemas de herramientas
+
+### Conocimientos clave:
+- **Descripción como mecanismo principal de selección:** la descripción debe desambiguar entre herramientas similares
+- Tool descriptions incluyen: qué hace, qué devuelve, formatos de entrada/ejemplos, cuándo usar vs alternativas
+- Evitar descripciones idénticas o superpuestas
+
+### Habilidades clave:
+- Escribir descripción clara de herramienta con ejemplos y casos límite
+- Identificar cuándo descripción insuficiente causa confusión de selección
+
+## 2.2 JSON Schema para herramientas
+
+### Conocimientos clave:
+- Sintaxis básica: `type`, `properties`, `required`, `enum`, `null`
+- Required vs optional: los campos required fuerzan al modelo a inventar si faltan
+- Nullable: `"type": ["string", "null"]` para datos que pueden faltar
+
+### Habilidades clave:
+- Diseñar esquemas que no fuercen fabricación de datos
+
+## 2.3 MCP Servers y configuración
+
+### Conocimientos clave:
+- Configuración de proyecto (`.mcp.json`) vs personal (`~/.claude.json`)
+- Conexión de múltiples servidores MCP simultáneamente
+- Uso de variables de entorno para secretos, no tokens en plaintext
+
+### Habilidades clave:
+- Configurar servidor MCP con variables de entorno
+
+## 2.4 Manejo de errores en MCP
+
+### Conocimientos clave:
+- `isError: true` indica fallo de herramienta
+- Errores estructurados deben incluir: categoría (transient/validation/business), reintentable, mensaje, query intentada, partial results
+- Errores genéricos no ayudan coordinadores a recuperarse
+
+### Habilidades clave:
+- Diseñar respuestas de error estructuradas que permitan coordinador tomar decisiones
+
+## 2.5 Recursos MCP
+
+### Conocimientos clave:
+- Recursos proporcionan contexto sin ejecutar acciones
+- Ejemplos: catálogos, esquemas BD, documentación, resúmenes
+- Previenen necesidad de llamadas exploratorias de herramientas
+
+---
+
+# Dominio 3: Configuración y flujos de trabajo de Claude Code (20%)
+
+## 3.1 Jerarquía CLAUDE.md
+
+### Conocimientos clave:
+- Tres niveles: usuario (`~/.claude/CLAUDE.md`), proyecto (`.claude/CLAUDE.md`), directorio (`CLAUDE.md` en subdirs)
+- El nivel más específico prevalece
+- Proyecto se gestiona a través de VCS, usuario y directorio son locales
+
+### Habilidades clave:
+- Decidir qué nivel colocar instrucciones para máxima efektividad
+
+## 3.2 Reglas y Skills
+
+### Conocimientos clave:
+- `.claude/rules/` con YAML frontmatter y campo `paths` para carga condicional
+- `.claude/skills/` para comandos reutilizables invocables mediante `/nombre`
+- SKILL.md frontmatter: `context: fork`, `allowed-tools`, `argument-hint`
+
+### Habilidades clave:
+- Usar `paths` glob patterns para condicionalidad
+- Decidir cuándo usar skill vs CLAUDE.md
+
+## 3.3 Modo de planificación vs ejecución directa
+
+### Conocimientos clave:
+- Plan mode: exploratorio, sin cambios, requiere aprobación
+- Direct execution: cambios inmediatos
+- Usar plan mode para cambios grandes, desconocidas codebases
+
+### Habilidades clave:
+- Identificar cuándo usar cada modo
+
+## 3.4 Claude Code CLI y CI/CD
+
+### Conocimientos clave:
+- `-p` / `--print` para modo no interactivo en CI/CD
+- `--output-format json --json-schema` para salida estructurada
+- Usar instancias independientes para generación vs revisión
+
+### Habilidades clave:
+- Escribir prompts de Claude CLI que produzcan salida estructurada para CI
+
+---
+
+# Dominio 4: Ingeniería de prompts y salida estructurada (20%)
+
+## 4.1 Few-shot prompting
+
+### Conocimientos clave:
+- Few-shot (2-4 ejemplos) vs descripciones textuales
+- Ejemplos para casos ambiguos, formatos de salida, distinción código válido/inválido
+- Ejemplos para extracción de diferentes formatos de documento
+
+### Habilidades clave:
+- Escribir ejemplos few-shot relevantes
+
+## 4.2 Criterios explícitos vs instrucciones vagas
+
+### Conocimientos clave:
+- Especificar **SOLO SI** para claridad
+- Incluir ejemplos para cada criterio de severidad
+- Definir negaciones (qué NO buscar)
+
+### Habilidades clave:
+- Refactor instrucciones vagas en criterios explícitos
+
+## 4.3 JSON Schema y validación
+
+### Conocimientos clave:
+- Sintaxis correcta JSON no garantiza semántica correcta
+- Validación de estructura vs semántica
+- Pydantic para validación con auto-generación de schema
+
+### Habilidades clave:
+- Usar Pydantic para validar y reintentar con feedback
+
+## 4.4 Prompt Chaining
+
+### Conocimientos clave:
+- Dividir tareas complejas en pasos secuenciales
+- Evita dilución de atención
+- Proporciona calidad consistente
+
+### Habilidades clave:
+- Diseñar cadena de prompts para tareas multifase
+
+## 4.5 Retry-with-feedback y self-correction
+
+### Conocimientos clave:
+- Validar, detectar errores, reintentar con contexto de error
+- Self-correction: incluir valor afirmado Y calculado
+- Conflictos detectados permiten procesamiento diferente
+
+### Habilidades clave:
+- Implementar ciclos de validación/reintento
+
+---
+
+# Dominio 5: Gestión de contexto y confiabilidad (15%)
+
+## 5.1 Problemas de ventana de contexto
+
+### Conocimientos clave:
+- Lost-in-the-middle: información del medio es menos confiable
+- Acumulación de resultados de herramientas: cada call agrega datos
+- Sumarización progresiva: números, fechas, porcentajes se vuelven vagas
+
+### Habilidades clave:
+- Estrategias para colocar información crítica
+- Trimming de resultados de herramientas
+
+## 5.2 Ejecución de hechos y bloque de caso
+
+### Conocimientos clave:
+- Mantener bloque estructurado de hechos clave
+- Actualizar con nuevos hechos
+- Incluir en cada prompt independientemente de sumarización
+
+### Habilidades clave:
+- Diseñar bloque de casos que se mantenga consistente
+
+## 5.3 Escalada y Human-in-the-Loop
+
+### Conocimientos clave:
+- Desencadenantes confiables (solicitud explícita, política no cubre) vs no confiables (análisis de sentimiento)
+- Protocolos de transmisión estructurados
+- Confidence scores a nivel de campo para routing
+
+### Habilidades clave:
+- Implementar escalada confiable
+- Diseñar transmisiones autosuficientes
+
+## 5.4 Manejo de errores en sistemas multiagente
+
+### Conocimientos clave:
+- Categorías: transient, validation, business, permission
+- Errores estructurados vs genéricos
+- Continuar con resultados parciales, anotar brechas
+
+### Habilidades clave:
+- Propagar errores estructura a coordinadores
+- Usar anotaciones de cobertura en síntesis
+
+## 5.5 Provenance y atribución
+
+### Conocimientos clave:
+- Conservar conexión afirmación -> fuente
+- Manejar datos en conflicto: ambos valores + atribución
+- Incluir fechas para interpretación correcta
+
+### Habilidades clave:
+- Extraer claims con fuentes, URL, fechas
+
+---
+
+# PARTE III: EJERCICIOS PRÁCTICOS
+
+---
+
+## Ejercicio 1: Revisión de agentes y selección de herramientas
+
+**Objetivo:** Agentive loops, `stop_reason`, selección de herramientas basada en descripción.
+
+**Escenario:** Agente de soporte al cliente que maneja retornos y disputas de facturas usando herramientas: `get_customer`, `lookup_order`, `process_refund`, `escalate_to_human`.
+
+**Tareas:**
+1. Implementar ciclo agente básico: detectar `stop_reason`, ejecutar herramientas, añadir resultados
+2. Problema: modelo elige `escalate_to_human` inmediatamente en lugar de `get_customer` primero. Mejorar descripciones de herramientas.
+3. Simular fallo de herramienta (timeout en `lookup_order`), manejar gracefully
+4. Probar con escenarios: cliente solicita devolución vs cliente pide hablar con gerente
+
+**Dominios:** 1 (Arquitectura de agentes), 2 (Diseño de herramientas)
+
+---
+
+## Ejercicio 2: Configuración de proyecto para Claude Code
+
+**Objetivo:** CLAUDE.md, reglas con `paths`, skills, MCP.
+
+**Tareas:**
+1. Crear jerarquía CLAUDE.md: convenciones del proyecto que se aplican a todos
+2. `.claude/rules/` con rules específicas: uno para API files, uno para tests (con glob patterns)
+3. Crear skill `/review` que use `context: fork` para análisis de código
+4. Configurar MCP en `.mcp.json` con variables de entorno para GitHub y Jira
+5. Validar que diferentes usuarios del proyecto obtienen la misma configuración pero pueda tener personalizaciones en `~/.claude/`
+
+**Dominios:** 3 (Configuración Claude Code), 2 (Integración MCP)
+
+---
+
+## Ejercicio 3: Pipeline de extracción estructurada de datos
+
+**Objetivo:** JSON-schemas, tool_use para salida estructurada, ciclos validación/reintento, Message Batches.
+
+**Tareas:**
+1. Definir herramienta de extracción con JSON-schema (required/optional, enums con "other", nullable)
+2. Implementar ciclo validación: upon error -- reintentar con documento, extracción errónea, error específico
+3. Escribir ejemplos few-shot para documentos con diferentes estructuras
+4. Procesamiento batch: 100 documentos, manejo de fallos por `custom_id`
+5. Routing a humano: confidence scores por campo, análisis por tipo de documento
+
+**Dominios:** 4 (Ingeniería de prompts), 5 (Contexto y confiabilidad)
+
+---
+
+## Ejercicio 4: Pipeline multiagente con síntesis
+
+**Objetivo:** Orquestación de agentes, propagación de errores, provenance, síntesis.
+
+**Tareas:**
+1. Coordinador con 2+ subagentes: búsqueda web, análisis de documentos
+2. Contexto explícito en prompts de subagentes
+3. Salida estructurada de subagentes: claim, source URL, fecha, confianza
+4. Simular timeout: coordinador recibe partial results, continúa
+5. Conflicto de datos: dos fuentes con valores diferentes -- preservar ambos con atribución
+6. Síntesis final con anotaciones de cobertura (secciones COMPLETAMENTE CUBIERTAS vs PARCIALMENTE)
+
+**Dominios:** 1 (Arquitectura de agentes), 2 (Herramientas MCP), 5 (Contexto y confiabilidad)
+
+---
+
+# Apéndice: Tecnologías y conceptos
+
+| Tecnología | Aspectos clave |
+|---|---|
+| **Claude Agent SDK** | AgentDefinition, ciclos agentes, `stop_reason`, hooks (PostToolUse), generación de subagentes mediante Task, `allowedTools` |
+| **Model Context Protocol (MCP)** | Servidores MCP, herramientas, recursos, `isError`, descripciones de herramientas, `.mcp.json`, variables de entorno |
+| **Claude Code** | Jerarquía CLAUDE.md, `.claude/rules/` con glob-patterns, `.claude/commands/`, `.claude/skills/` con SKILL.md, modo planificación, `/compact`, `--resume`, `fork_session` |
+| **Claude Code CLI** | `-p` / `--print` para modo no interactivo, `--output-format json`, `--json-schema` |
+| **Claude API** | `tool_use` con JSON-schemas, `tool_choice` ("auto"/"any"/fuerza), `stop_reason`, `max_tokens`, prompts del sistema |
+| **Message Batches API** | Ahorro del 50%, ventana hasta 24 horas, `custom_id`, sin tool calling multi-turn |
+| **JSON Schema** | Required vs optional, campos nullable, tipos enum, `"other"` + detail, modo estricto |
+| **Pydantic** | Validación de estructura, validadores personalizados, auto-generación de schema, ciclos validación/reintento |
+| **Few-shot prompting** | 2-4 ejemplos, casos ambiguos, formatos de salida, criterios de severidad |
+| **Provenance** | Conservar afirmación -> fuente, manejar conflictos, incluir fechas |
+| **Escalada** | Desencadenantes confiables, transmisiones estructuradas, confidence scores por campo |
+| **Manejo de errores** | Categorías de errores, errores estructurados, partial failures, anotaciones de cobertura |
+
+---
+
+**Fin de la Guía de Estudio**
+
+Esta guía proporciona una base sólida para el examen Claude Certified Architect -- Foundations. Revisa los dominios, practica con los ejercicios y asegúrate de entender los antipatrones además de los patrones correctos.
+
+¡Buena suerte en tu examen!
