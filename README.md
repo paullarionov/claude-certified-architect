@@ -109,6 +109,7 @@ This repository contains study materials for the **Claude Certified Architect �
 - Claude Code: Commands Cheatsheet https://claude-guides.com
 - Top 80 Claude Skills, Agents & GitHub Repos for AI — The Complete Guide https://x.com/paullarionov/status/2038254131849134220
 - Claude Certified Architect in Spanish — study guides for Foundations and Professional, an EN→ES glossary, and a free 163-question practice simulator (no signup) https://github.com/juanmartincoma-collab/claude-certified-architect-es
+- [Free timed practice exams for all four Claude certifications](https://youraidept.com/network/claude-certification-practice-exam): full-length mocks drawn to the published domain weights (60/120 for CCAR-F and CCAO-F, 53/120 for CCDV-F, 63/120 for CCAR-P), scored against the 720 pass mark with a per-domain breakdown and explanations. 333 original questions, no sign-up, from YAID, a Claude Partner Network firm.
 
 ## How to Contribute
 
