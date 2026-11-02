@@ -1046,8 +1046,11 @@ The Message Batches API lets you submit batches of requests for asynchronous pro
 |---|---|
 | Savings | **50%** compared to synchronous calls |
 | Processing window | Up to **24 hours** (no latency SLA guarantee) |
+| Batch size limit | **100,000** requests or **256 MB** per batch, whichever is reached first |
 | Multi-turn tool calling | **Not supported** (one request = one response) |
 | Correlation | `custom_id` field to link request and response |
+
+Jobs larger than the batch size limit must be split across multiple batches.
 
 ## 7.2 When to Use Batch API vs Synchronous API
 
