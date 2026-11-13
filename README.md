@@ -122,6 +122,7 @@ Thanks to [Silvan Mühlemann](https://github.com/silvanm) and the team at mühle
 - Claude Code: Commands Cheatsheet https://claude-guides.com
 - Top 80 Claude Skills, Agents & GitHub Repos for AI — The Complete Guide https://x.com/paullarionov/status/2038254131849134220
 - Claude Certified Architect in Spanish — study guides for Foundations and Professional, an EN→ES glossary, and a free 163-question practice simulator (no signup) https://github.com/juanmartincoma-collab/claude-certified-architect-es
+- Cloud & SRE Exam Arena — free open-source interactive exam simulator for Anthropic Claude certifications (Foundations, Associate, Developer) with bilingual (ES/EN) scenarios, per-option diagnostic rationales, and architecture diagrams (no login required) https://fabianimv.github.io/exam-arena/
 
 ## How to Contribute
 
