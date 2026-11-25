@@ -2120,7 +2120,7 @@ def trim_order_fields(result):
 
 > 60 запитань за 4 сценаріями. Формат і складність відповідають реальному іспиту.
 >
-> Також можна виконувати ці завдання в HTML-файлі, що імітує іспит: [Практичний тест (EN)](https://github.com/paullarionov/claude-certified-architect/blob/main/practical_test_en.html)
+> Також можна виконувати ці завдання в HTML-файлі, що імітує іспит: [Практичний тест (UK)](practical_test_uk.html)
 
 ## Сценарій: багатоагентна дослідницька система
 
